@@ -1,0 +1,122 @@
+---
+title: "fastq-dump"
+description: "Convert SRA accessions to FASTQ format (legacy tool)"
+---
+
+`fastq-dump` converts SRA accessions to FASTQ format. It is the original SRA conversion tool and remains useful for specific use cases, but for most workflows you should use `fasterq-dump` instead.
+
+<Note>
+  `fasterq-dump` is the recommended replacement for `fastq-dump`. It is multi-threaded and significantly faster for large accessions. Use `fastq-dump` only when you need features not supported by `fasterq-dump` (per-spot range selection, built-in gzip compression, stdout with split modes, or processing multiple accessions in one call).
+</Note>
+
+## Synopsis
+
+```bash
+fastq-dump [options] <accession|file> [<accession2> ...]
+```
+
+## Basic usage
+
+```bash
+# Single-end reads
+fastq-dump SRR000001
+
+# Paired-end reads split into _1 and _2 files
+fastq-dump --split-3 SRR000001
+
+# Skip technical reads (recommended)
+fastq-dump --split-3 --skip-technical SRR000001
+
+# Compress output with gzip
+fastq-dump --split-3 --gzip SRR000001
+
+# Write to stdout
+fastq-dump --split-3 --stdout SRR000001 | gzip > SRR000001.fastq.gz
+
+# Dump only a range of spots
+fastq-dump -N 1 -X 10000 SRR000001
+```
+
+## Options
+
+<ParamField path="--split-3" type="boolean">
+  Split spots into reads. Paired reads go to `_1.fastq` and `_2.fastq`; singletons go to the base `.fastq` file. Recommended for paired-end data.
+</ParamField>
+
+<ParamField path="--split-spot" type="boolean">
+  Split spots into reads, writing all reads to one file.
+</ParamField>
+
+<ParamField path="--split-files" type="boolean">
+  Write each read to a separate numbered file.
+</ParamField>
+
+<ParamField path="--skip-technical" type="boolean">
+  Exclude technical reads from output. Recommended for most workflows.
+</ParamField>
+
+<ParamField path="--gzip" type="boolean">
+  Compress output files with gzip.
+</ParamField>
+
+<ParamField path="--bzip2" type="boolean">
+  Compress output files with bzip2.
+</ParamField>
+
+<ParamField path="-N / --minSpotId" type="integer">
+  First spot ID to include (1-based). Useful for processing a subset of reads.
+</ParamField>
+
+<ParamField path="-X / --maxSpotId" type="integer">
+  Last spot ID to include. Use with `-N` to extract a range.
+</ParamField>
+
+<ParamField path="-Z / --stdout" type="boolean">
+  Write FASTQ to stdout instead of files.
+</ParamField>
+
+<ParamField path="-O / --outdir" type="string">
+  Output directory for FASTQ files. Default: current directory.
+</ParamField>
+
+<ParamField path="-A / --accession" type="string">
+  Accession to process. Can also be passed as a positional argument.
+</ParamField>
+
+<ParamField path="--ngc" type="string">
+  Path to a dbGaP NGC file for controlled-access data.
+</ParamField>
+
+## When to use fastq-dump vs fasterq-dump
+
+| Use case | Recommended tool |
+|---|---|
+| Large-scale batch conversions | `fasterq-dump` |
+| High-performance workflows | `fasterq-dump` |
+| Stdout with split-3 or split-files | `fastq-dump` |
+| Per-spot range (`-N`/`-X`) | `fastq-dump` |
+| Built-in gzip/bzip2 compression | `fastq-dump` |
+| Multiple accessions in one call | `fastq-dump` |
+| Standard paired-end FASTQ | `fasterq-dump` |
+
+## Equivalent commands
+
+These command pairs produce the same output; fasterq-dump is faster:
+
+```bash
+# Split-3 (recommended paired-end)
+fastq-dump SRRXXXXXX --split-3 --skip-technical
+fasterq-dump SRRXXXXXX
+
+# Split-spot
+fastq-dump SRRXXXXXX --split-spot --skip-technical
+fasterq-dump SRRXXXXXX --split-spot
+
+# Split-files
+fastq-dump SRRXXXXXX --split-files --skip-technical
+fasterq-dump SRRXXXXXX --split-files
+
+# No splitting (concatenated)
+fastq-dump SRRXXXXXX
+fasterq-dump SRRXXXXXX --concatenate-reads --include-technical
+```

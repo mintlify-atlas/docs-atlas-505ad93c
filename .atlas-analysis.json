@@ -1,28 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "SRA Toolkit",
+  "projectType": "cli-tool",
+  "projectName": "SRA Toolkit",
+  "projectDescription": "A collection of command-line tools and libraries from NCBI for downloading, converting, and analyzing data from the INSDC Sequence Read Archive (SRA).",
   "theme": "aspen",
-  "colors": {
-    "primary": "#245b8c",
-    "light": "#838689",
-    "dark": "#e9ebec"
-  },
-  "favicon": "https://media.brand.dev/9c29ac7f-4a99-49ea-ab8a-22da0a485180.jpg",
-  "logo": {
-    "light": "https://media.brand.dev/013bea56-42cf-4b33-bf1f-267777ef9b02.svg",
-    "dark": "https://media.brand.dev/013bea56-42cf-4b33-bf1f-267777ef9b02.svg"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/ncbi/sra-tools"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/ncbi/sra-tools"
-    }
-  },
+  "primaryColor": "#245b8c",
+  "lightColor": "#838689",
+  "darkColor": "#e9ebec",
   "navigation": {
     "tabs": [
       {
@@ -93,5 +76,29 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Fast multi-threaded FASTQ extraction with fasterq-dump",
+    "Prefetch and caching for SRA accessions from NCBI, AWS, and GCP",
+    "Support for controlled-access dbGaP data via NGC files",
+    "SRA Lite format support for reduced storage and faster downloads",
+    "Alignment output in SAM/BAM format via sra-pileup",
+    "NGS language bindings for C++, Java, and Python",
+    "Cross-platform support for Linux, macOS, and Windows"
+  ],
+  "publicApiSurface": [
+    "fasterq-dump",
+    "fastq-dump",
+    "prefetch",
+    "sra-pileup",
+    "vdb-dump",
+    "vdb-config",
+    "vdb-validate",
+    "sra-stat",
+    "sra-info",
+    "srapath",
+    "kdbmeta",
+    "align-info",
+    "vdb-decrypt"
+  ]
 }

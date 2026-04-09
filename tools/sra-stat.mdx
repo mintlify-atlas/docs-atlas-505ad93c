@@ -1,0 +1,104 @@
+---
+title: "sra-stat"
+description: "Display statistics and metadata about SRA accessions"
+---
+
+`sra-stat` generates detailed statistics about SRA accessions: read counts, base counts, read length distributions, quality score distributions, and alignment summaries. Use it to assess data quality before committing to large-scale processing.
+
+## Synopsis
+
+```bash
+sra-stat [options] <accession> [<accession2> ...]
+```
+
+## Basic examples
+
+```bash
+# Statistics for a single accession
+sra-stat SRR000001
+
+# XML output
+sra-stat --xml SRR000001
+
+# Quick summary (no per-base stats)
+sra-stat --quick SRR000001
+
+# Local file
+sra-stat /path/to/downloaded/SRR000001
+```
+
+## Options
+
+<ParamField path="--xml" type="flag">
+  Output statistics in XML format.
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Output statistics in JSON format.
+</ParamField>
+
+<ParamField path="--quick" type="flag">
+  Quick mode. Reports summary statistics only, without per-base quality or length distributions. Faster for large accessions.
+</ParamField>
+
+<ParamField path="-v / --verbose" type="flag">
+  Verbose output. Repeat the flag (e.g., `-vv`) for additional detail.
+</ParamField>
+
+<ParamField path="--ngc <path>" type="string">
+  Path to an NGC file for accessing dbGaP-protected accessions.
+</ParamField>
+
+## Statistics reported
+
+`sra-stat` reports the following for each accession:
+
+- **Spot count** — total number of spots (clusters/reads in sequencing terminology)
+- **Base count** — total bases, broken down by read type
+- **Biological read count** — reads flagged as biological (vs. technical)
+- **Read length distribution** — minimum, maximum, and average read lengths
+- **Quality score distribution** — per-quality-score base counts
+- **Aligned vs. unaligned reads** — for cSRA accessions with alignment data
+- **Library metadata** — read group IDs, library names, and sample names from BAM `@RG` headers (when present)
+
+## Example output
+
+```text
+<Statistics xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Table name="SRR000001">
+    <Statistics bio_len="238,254,440" bio_len_dup="0" spot_count="470,985"
+                spot_count_dup="0" base_count="484,591,640" base_count_bio="238,254,440">
+      <Reads count="470,985" average="507.97" stdev="0">
+        <Read number="1" count="470,985" average="507.97" stdev="0"/>
+      </Reads>
+    </Statistics>
+  </Table>
+</Statistics>
+```
+
+## Use case: QC before large-scale processing
+
+Run a quick check before committing storage and compute to a large accession:
+
+```bash
+# Check summary stats before running fasterq-dump
+sra-stat --quick SRR341578
+```
+
+For pipeline integration, use the JSON output to parse programmatically:
+
+```bash
+sra-stat --json SRR341578 | jq '.spot_count'
+```
+
+## Checking a local file
+
+Since 3.1.1, `sra-stat` can report statistics for a locally downloaded file without requiring network access:
+
+```bash
+sra-stat /data/sra-cache/SRR341578/SRR341578.sra
+```
+
+<Note>
+  A crash regression affecting runs with a default `SPOT_GROUP` in metadata was fixed in 3.0.3. A fix for loading metadata in databases was included in 3.1.0. Upgrade to at least 3.1.0 for reliable results across all accession types.
+</Note>

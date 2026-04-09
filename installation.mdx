@@ -1,0 +1,209 @@
+---
+title: "Installation"
+description: "Install the SRA Toolkit on Linux, macOS, or Windows"
+---
+
+The SRA Toolkit can be installed via Conda, downloaded as a pre-built binary, or compiled from source. For most users, Conda or the pre-built binaries are the fastest path to a working installation.
+
+<Warning>
+  Versions 2.9.6 and older can no longer connect to the NCBI data location service due to updated security requirements at NCBI. If you are running an old version, you must upgrade to continue accessing SRA data. Additionally, version 3.0.0 replaced the legacy Makefile-based build system with CMake — old makefiles are no longer supported when building from source.
+</Warning>
+
+## Conda (recommended)
+
+Conda is the easiest installation method and works on Linux and macOS. The `sra-tools` package is available from the Bioconda channel.
+
+<Steps>
+  <Step title="Add Bioconda to your channels">
+    If you have not already configured Bioconda, add the required channels in order:
+
+    ```bash
+    conda config --add channels defaults
+    conda config --add channels bioconda
+    conda config --add channels conda-forge
+    ```
+  </Step>
+  <Step title="Install sra-tools">
+    Install into your current environment or a new named environment:
+
+    ```bash
+    # Install into the current environment
+    conda install -c bioconda sra-tools
+
+    # Or create a dedicated environment
+    conda create -n sra-tools -c bioconda sra-tools
+    conda activate sra-tools
+    ```
+  </Step>
+  <Step title="Verify the installation">
+    ```bash
+    fastq-dump --version
+    fasterq-dump --version
+    ```
+
+    Expected output:
+
+    ```text
+    fastq-dump : 3.4.1
+
+    fasterq-dump : 3.4.1
+    ```
+  </Step>
+</Steps>
+
+## Pre-built binaries
+
+Pre-built binaries are available for Linux, macOS, and Windows from the NCBI download page and FTP server. No compilation is required.
+
+Download page: [https://github.com/ncbi/sra-tools/wiki/01.-Downloading-SRA-Toolkit](https://github.com/ncbi/sra-tools/wiki/01.-Downloading-SRA-Toolkit)
+
+<Tabs>
+  <Tab title="Linux">
+    <Steps>
+      <Step title="Download the tarball">
+        ```bash
+        wget https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/current/sratoolkit.current-ubuntu64.tar.gz
+        ```
+
+        Packages for other Linux distributions (CentOS, Fedora, AlmaLinux, and others) are available on the download page. Note that CentOS builds are no longer provided as of release 3.2.1.
+      </Step>
+      <Step title="Extract the archive">
+        ```bash
+        tar -xzf sratoolkit.current-ubuntu64.tar.gz
+        ```
+
+        This creates a directory named `sratoolkit.<version>-ubuntu64/`.
+      </Step>
+      <Step title="Add the binaries to your PATH">
+        Add the `bin/` directory to your shell's `PATH` so you can invoke toolkit commands from anywhere:
+
+        ```bash
+        export PATH=$PATH:$PWD/sratoolkit.*/bin
+        ```
+
+        To make this permanent, add the export line to your `~/.bashrc` or `~/.bash_profile` with the full absolute path substituted for `$PWD/sratoolkit.*/bin`.
+      </Step>
+      <Step title="Verify the installation">
+        ```bash
+        fastq-dump --version
+        fasterq-dump --version
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="macOS">
+    <Steps>
+      <Step title="Download the tarball">
+        Download the macOS package from the download page, or use `curl`:
+
+        ```bash
+        curl -O https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/current/sratoolkit.current-mac64.tar.gz
+        ```
+
+        An Apple Silicon (arm64) build is also available — check the download page for the current filename.
+      </Step>
+      <Step title="Extract and add to PATH">
+        ```bash
+        tar -xzf sratoolkit.current-mac64.tar.gz
+        export PATH=$PATH:$PWD/sratoolkit.*/bin
+        ```
+      </Step>
+      <Step title="Allow the binaries through Gatekeeper">
+        On macOS, you may need to allow the binaries to run. Open **System Settings → Privacy & Security** and allow the toolkit executables, or run:
+
+        ```bash
+        xattr -d com.apple.quarantine sratoolkit.*/bin/*
+        ```
+      </Step>
+      <Step title="Verify the installation">
+        ```bash
+        fastq-dump --version
+        fasterq-dump --version
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+      You can also install via Bioconda on macOS using the Conda instructions above. This is often simpler than managing Gatekeeper permissions manually.
+    </Note>
+  </Tab>
+  <Tab title="Windows">
+    <Steps>
+      <Step title="Download the installer">
+        Download the Windows `.zip` package from the [download page](https://github.com/ncbi/sra-tools/wiki/01.-Downloading-SRA-Toolkit).
+      </Step>
+      <Step title="Extract the archive">
+        Right-click the `.zip` file and choose **Extract All**, or use a tool like 7-Zip. Extract to a directory of your choice, for example `C:\sratoolkit`.
+      </Step>
+      <Step title="Add the bin directory to your PATH">
+        Open **System Properties → Environment Variables**, then edit the `Path` variable under **User variables** and add the full path to the `bin\` directory inside the extracted folder (e.g. `C:\sratoolkit\bin`).
+
+        Alternatively, from PowerShell:
+
+        ```bash
+        [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\sratoolkit\bin", "User")
+        ```
+      </Step>
+      <Step title="Verify the installation">
+        Open a new Command Prompt or PowerShell window and run:
+
+        ```bash
+        fastq-dump --version
+        fasterq-dump --version
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Building from source
+
+Building from source requires CMake 3.16 or later (3.20 on Windows), a C++ compiler, and Git. This approach is intended for developers or users who need to build a custom configuration.
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/ncbi/sra-tools.git
+    cd sra-tools
+    ```
+  </Step>
+  <Step title="Create a build directory">
+    In-source builds are not supported. Always use a separate build directory:
+
+    ```bash
+    mkdir build && cd build
+    ```
+  </Step>
+  <Step title="Configure with CMake">
+    ```bash
+    cmake ..
+    ```
+
+    By default, only the end-user-facing external tools are built. To include additional tool sets, pass flags to CMake:
+
+    ```bash
+    # Build internal tools as well
+    cmake -DBUILD_TOOLS_INTERNAL=ON ..
+
+    # Build loader tools
+    cmake -DBUILD_TOOLS_LOADERS=ON ..
+    ```
+  </Step>
+  <Step title="Compile">
+    ```bash
+    make
+    ```
+
+    To build a specific tool rather than everything:
+
+    ```bash
+    make fasterq-dump
+    ```
+  </Step>
+  <Step title="Verify the build">
+    ```bash
+    fastq-dump --version
+    fasterq-dump --version
+    ```
+  </Step>
+</Steps>

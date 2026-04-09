@@ -1,0 +1,198 @@
+---
+title: "fasterq-dump"
+description: "Fast multi-threaded extraction of FASTQ reads from SRA accessions"
+---
+
+`fasterq-dump` uses temporary files and multi-threading to extract FASTQ reads from SRA accessions. It is the recommended replacement for `fastq-dump` for most use cases.
+
+## Synopsis
+
+```bash
+fasterq-dump [options] <accession|file>
+```
+
+## Basic usage
+
+```bash
+# Extract reads (default: split-3 mode)
+fasterq-dump SRR000001
+
+# Extract to a specific directory
+fasterq-dump SRR000001 -O /mnt/data
+
+# Use RAM disk for temp files (fastest)
+fasterq-dump SRR341578 -t /dev/shm
+
+# Use 8 threads
+fasterq-dump SRR000001 -e 8
+
+# Show progress bar
+fasterq-dump SRR341578 -p
+
+# Force overwrite of existing output files
+fasterq-dump -f SRR000001
+```
+
+## Output modes
+
+<Tabs>
+  <Tab title="Split-3 (default)">
+    Spots are split into reads. Paired reads go to `_1.fastq` and `_2.fastq`; unpaired reads go to `.fastq`.
+
+    ```bash
+    fasterq-dump SRR341578
+    # output: SRR341578_1.fastq, SRR341578_2.fastq
+    ```
+  </Tab>
+  <Tab title="Split-spot (-s)">
+    All reads written to one file; spots split into individual reads.
+
+    ```bash
+    fasterq-dump SRR341578 --split-spot
+    ```
+  </Tab>
+  <Tab title="Split-file (-S)">
+    Each nth read goes to a separate numbered file.
+
+    ```bash
+    fasterq-dump SRR341578 --split-files
+    ```
+  </Tab>
+  <Tab title="Concatenated">
+    Spots are not split — 4 lines per spot written to one file.
+
+    ```bash
+    fasterq-dump SRR341578 --concatenate-reads
+    ```
+  </Tab>
+</Tabs>
+
+## Options
+
+<ParamField path="-O / --outdir" type="string">
+  Output directory. Created if it does not exist. Default: current directory.
+</ParamField>
+
+<ParamField path="-t / --temp" type="string">
+  Directory for temporary scratch files. Default: current directory. For best performance, use a different filesystem than the output directory.
+</ParamField>
+
+<ParamField path="-e / --threads" type="integer">
+  Number of threads to use. Default: 6.
+</ParamField>
+
+<ParamField path="-p / --progress" type="boolean">
+  Show progress bars during extraction.
+</ParamField>
+
+<ParamField path="-f / --force" type="boolean">
+  Overwrite existing output files. Without this flag, fasterq-dump will fail if output files already exist.
+</ParamField>
+
+<ParamField path="--split-3" type="boolean">
+  Split-3 output mode (default). Paired reads to `_1`/`_2` files; singletons to base file.
+</ParamField>
+
+<ParamField path="-s / --split-spot" type="boolean">
+  Write reads into one file; spots split into reads.
+</ParamField>
+
+<ParamField path="-S / --split-files" type="boolean">
+  Write each read to a separate file.
+</ParamField>
+
+<ParamField path="--concatenate-reads" type="boolean">
+  Do not split spots — write one entry per spot.
+</ParamField>
+
+<ParamField path="--include-technical" type="boolean">
+  Include technical reads in output. Automatically switches to `--split-files` mode.
+</ParamField>
+
+<ParamField path="-Z / --stdout" type="boolean">
+  Write to stdout. Not available for `split-3` or `split-files` modes.
+</ParamField>
+
+<ParamField path="--ngc" type="string">
+  Path to a dbGaP NGC file for controlled-access data.
+</ParamField>
+
+## Progress output
+
+With `-p`, fasterq-dump shows progress bars for each processing step. For a cSRA (aligned) accession:
+
+```text
+lookup :|-------------------------------------------------- 100.00%
+merge  : 13255208
+join   :|-------------------------------------------------- 100.00%
+concat :|-------------------------------------------------- 100.00%
+spots read      : 7,549,706
+reads read      : 15,099,412
+reads written   : 15,099,412
+```
+
+For a flat (unaligned) accession:
+
+```text
+join   :|-------------------------------------------------- 100.00%
+concat :|-------------------------------------------------- 100.00%
+spots read      : 470,985
+reads read      : 470,985
+reads written   : 470,985
+```
+
+## Disk space planning
+
+fasterq-dump needs scratch space approximately equal to the final output size. As a rule of thumb, have **8–10x the accession size** available.
+
+```bash
+# Check accession size
+vdb-dump --info SRR341578
+# Look for the "size" line, e.g.: size   : 932,308,473
+
+# Check available space
+df -h .
+
+# Check available RAM disk
+df -h /dev/shm
+```
+
+<Tip>
+  Point the temp directory to `/dev/shm` (RAM disk) if you have sufficient RAM, and use a separate filesystem for output. This is the single biggest performance improvement.
+
+  ```bash
+  fasterq-dump SRR341578 -t /dev/shm -O /data/output
+  ```
+</Tip>
+
+## Differences from fastq-dump
+
+| Feature | fasterq-dump | fastq-dump |
+|---|---|---|
+| Multi-threaded | Yes (default 6) | No |
+| `--gzip` / `--bzip2` | No — compress after | Yes |
+| Multiple accessions | No — one at a time | Yes |
+| `--minSpotId` / `--maxSpotId` | No | Yes |
+| `--stdout` with split modes | Not for split-3/split-files | Yes |
+| `-A` accession flag | No — pass directly | Yes |
+
+**Equivalent commands:**
+
+```bash
+# fastq-dump default ≡ fasterq-dump --concatenate-reads --include-technical
+fastq-dump SRRXXXXXX
+fasterq-dump SRRXXXXXX --concatenate-reads --include-technical
+
+# fastq-dump split-3 ≡ fasterq-dump default
+fastq-dump SRRXXXXXX --split-3 --skip-technical
+fasterq-dump SRRXXXXXX
+```
+
+## What's new
+
+| Version | Change |
+|---|---|
+| 3.4.0 | Better error reporting; improved PacBio accession handling; tolerates missing metadata |
+| 3.3.0 | Reads longer than 65K now supported |
+| 3.2.1 | Fixed crash with WGS references; fixed failures when accessing runs via HTTP |
+| 3.0.5 | Added PacBio support; added reference sequence output |

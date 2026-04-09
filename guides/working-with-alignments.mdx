@@ -1,0 +1,110 @@
+---
+title: "Working with Alignments"
+description: "Generate pileups and SAM/BAM output from aligned SRA data"
+---
+
+Some SRA accessions are stored in **cSRA** (compressed SRA with alignment) format. These accessions contain reads mapped to reference sequences and support alignment-specific operations such as pileup generation and SAM/BAM export.
+
+<Info>
+cSRA accessions require reference sequences to reconstruct alignments. When you run `prefetch` on a cSRA accession, it automatically downloads any external reference sequences the run depends on. You do not need to manage references manually.
+</Info>
+
+## Checking alignment information
+
+Before working with an accession, inspect its alignment statistics:
+
+```bash
+align-info SRR341578
+```
+
+This shows the reference sequences used, the number of aligned reads, and other alignment metadata.
+
+## Generating pileup output
+
+`sra-pileup` produces pileup statistics for aligned accessions. Basic usage:
+
+```bash
+sra-pileup SRR341578
+```
+
+Output is written to stdout in a tab-separated pileup format, one line per reference position.
+
+### Filtering by mapping quality
+
+```bash
+sra-pileup SRR341578 --minmapq 20
+```
+
+Reads with a mapping quality below the threshold are excluded from the pileup.
+
+### Restricting to a genomic region
+
+```bash
+sra-pileup SRR341578 -r chr1:1-1000000
+```
+
+The `-r` option accepts a reference sequence name with an optional coordinate range. You can call it multiple times to specify multiple regions.
+
+## SAM/BAM output
+
+`sra-pileup` can output SAM format by switching its function mode:
+
+```bash
+sra-pileup --function sam SRR341578
+```
+
+This streams SAM records to stdout. You can pipe directly to `samtools` for sorting and compression:
+
+```bash
+sra-pileup --function sam SRR341578 | samtools sort -o output.bam
+samtools index output.bam
+```
+
+## Resolving reference locations
+
+If `sra-pileup` cannot find a reference sequence, use `srapath` to inspect how the toolkit resolves the accession and its dependencies:
+
+```bash
+srapath SRR341578
+```
+
+As of toolkit 3.0.7, a bug that caused "reference not found" errors for references stored inside a run (rather than as external files) has been fixed.
+
+## Streaming without prefetch
+
+You can run `sra-pileup` directly on a remote accession without downloading it first:
+
+```bash
+sra-pileup SRR341578
+```
+
+The toolkit fetches data on demand. For this to work, NCBI SRA remote access must be enabled in `vdb-config`. For large or repeated analyses, downloading with `prefetch` first avoids redundant network transfers.
+
+## Inspecting raw data with vdb-dump
+
+`vdb-dump` gives you direct access to the columns stored in an SRA accession, including both aligned and unaligned accessions.
+
+Inspect available columns and accession metadata:
+
+```bash
+vdb-dump --info SRR000001
+```
+
+Dump specific columns:
+
+```bash
+vdb-dump -C READ,QUALITY SRR000001
+```
+
+This is useful for verifying data content, debugging unexpected output from other tools, or exploring the internal structure of an accession before writing a processing pipeline.
+
+## Pileup options reference
+
+| Option | Description |
+|--------|-------------|
+| `--minmapq` / `-q` | Minimum mapping quality to include a read |
+| `--duplicates` / `-d` | Include duplicate reads |
+| `--noskip` / `-s` | Do not skip reference positions with no coverage |
+| `--spotgroups` / `-p` | Break down depth by spot group |
+| `-r` | Restrict output to a reference sequence or region |
+| `--function` | Output mode: `count`, `sam`, `stat`, and others |

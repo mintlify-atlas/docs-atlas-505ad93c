@@ -1,0 +1,122 @@
+---
+title: "Configuration Overview"
+description: "Configure the SRA Toolkit using vdb-config"
+---
+
+The `vdb-config` tool is the single interface for inspecting and changing all SRA Toolkit settings. It controls where data is cached locally, whether remote NCBI access is enabled, cloud credentials, dbGaP project imports, and more.
+
+## Viewing the current configuration
+
+Run `vdb-config` with no arguments to print your current configuration in XML format. No changes are made.
+
+```bash
+vdb-config
+```
+
+## Interactive mode
+
+The recommended way to configure the toolkit is through the interactive TUI dialog:
+
+```bash
+vdb-config --interactive
+# or equivalently:
+vdb-config -i
+```
+
+This opens a colored, menu-driven interface. Use the following keys to navigate:
+
+| Key | Action |
+|-----|--------|
+| `Tab` / cursor keys | Move focus between elements |
+| `Space` / `Enter` | Press a button or toggle a checkbox |
+| `q` or `6` | Quit without saving |
+| Navigate to "exit" + `Enter` | Quit without saving |
+| Navigate to "Save and exit" + `Enter` | Save changes and quit |
+
+<Note>
+Changes you make in the interactive dialog are **not** written to disk until you choose "Save and exit". Pressing `q` or `6` discards all changes.
+</Note>
+
+### Text-only mode
+
+If the colored TUI displays incorrectly due to terminal compatibility issues, use the textual fallback:
+
+```bash
+vdb-config --interactive --interactive-mode textual
+```
+
+This presents a sequential, text-only dialog that works on any terminal.
+
+## Key settings
+
+### Cache / local workspace location
+
+Downloaded SRA data is cached at `~/ncbi/public` by default. If your home directory does not have enough space, change the cache path.
+
+**Via command line:**
+
+```bash
+vdb-config --set /repository/user/main/public/root=/path/to/cache
+```
+
+**Via interactive mode:**
+
+Open `vdb-config -i`, navigate to the "Open Access Data" entry in the "local workspaces" section, and select "Change" to pick a new directory.
+
+<Tip>
+If your home directory is too small for SRA downloads, change the cache path to a larger volume — for example, a mounted data disk or scratch filesystem.
+</Tip>
+
+### Remote access (NCBI SRA)
+
+The "NCBI SRA" checkbox in the interactive dialog enables or disables streaming SRA accessions directly from NCBI without downloading them first. When enabled and internet access is available, tools like `sra-pileup` can operate on accessions on the fly:
+
+```bash
+sra-pileup SRR341578
+```
+
+The toolkit fetches the required data from NCBI servers as needed — no explicit `prefetch` step required.
+
+### Site installation
+
+A "site" checkbox may appear below the "NCBI SRA" checkbox in the interactive dialog. This controls access to a local institutional mirror of SRA data.
+
+<Note>
+If the "site" checkbox is not visible, no site-level installation of SRA data exists on your system. This is normal for most individual workstations.
+</Note>
+
+### Prefetch cache behavior
+
+By default, `prefetch` downloads files into the public user repository (the cache path set above). You can change this behavior:
+
+```bash
+# Download to the current working directory instead
+vdb-config --prefetch-to-cwd
+
+# Download to the user repository (default behavior)
+vdb-config --prefetch-to-user-repo
+```
+
+## Restoring defaults
+
+To reset all configuration back to the toolkit defaults:
+
+```bash
+vdb-config --restore-defaults
+```
+
+## Common flags reference
+
+| Flag | Alias | Description |
+|------|-------|-------------|
+| `--interactive` | `-i` | Open the TUI configuration dialog |
+| `--interactive-mode textual` | | Use text-only sequential dialog |
+| `--restore-defaults` | | Reset to default settings |
+| `--set KEY=VALUE` | `-s` | Set a configuration node value |
+| `--get KEY` | | Read a configuration node value |
+| `--report-cloud-identity` | | Show cloud identity reporting settings |
+| `--cloud-info` | `-C` | Display cloud-related information |
+| `--prefetch-to-cwd` | | Prefetch downloads to current directory |
+| `--prefetch-to-user-repo` | | Prefetch downloads to user repository (default) |
+| `--proxy` | | Set HTTP proxy server configuration |
+| `--proxy-disable` | | Enable or disable HTTP proxy |

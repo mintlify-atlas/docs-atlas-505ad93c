@@ -1,0 +1,101 @@
+---
+title: "Downloading SRA Data"
+description: "Use prefetch to download SRA accessions and manage your local cache"
+---
+
+`prefetch` is the recommended way to download SRA data before processing it locally. Downloading first and then converting avoids repeated network transfers for large accessions and gives you reliable, resumable downloads with checksum verification.
+
+## Basic usage
+
+Download a single accession to the current directory:
+
+```bash
+prefetch SRR000001
+```
+
+The downloaded file is stored in your local cache (by default `~/ncbi/public/`). The file extension is `.sra` for SRA Normalized format or `.sralite` for SRA Lite format.
+
+## Specifying an output directory
+
+```bash
+prefetch --output-directory /path/to/dir SRR000001
+```
+
+If the path does not exist, `prefetch` creates it automatically.
+
+## Downloading multiple accessions
+
+Pass accessions as space-separated arguments:
+
+```bash
+prefetch SRR000001 SRR000002 SRR000003
+```
+
+To download from a file containing one accession per line:
+
+```bash
+prefetch --option-file accessions.txt
+```
+
+## Checking accession size before downloading
+
+Before committing to a large download, inspect the accession metadata:
+
+```bash
+vdb-dump --info SRR341578
+```
+
+The output includes a `size` field showing the compressed size of the accession on disk. Use this to plan storage requirements — the extracted FASTQ files will typically be 4–10x larger than the raw accession size.
+
+## SRA Lite vs. SRA Normalized format
+
+SRA data is available in two formats:
+
+- **SRA Normalized** (`.sra`): Full per-base quality scores. This is the default format used by the toolkit.
+- **SRA Lite** (`.sralite`): Simplified quality scores (uniform per-read values). Smaller file size, faster to download and convert.
+
+If your analysis does not require per-base quality scores, SRA Lite can significantly reduce transfer and processing time.
+
+To request SRA Lite format, either set "Prefer SRA Lite files with simplified base quality scores" in `vdb-config`, or use the `--eliminate-quals` flag:
+
+```bash
+prefetch --eliminate-quals SRR000001
+```
+
+<Note>
+`--eliminate-quals` downloads SRA Lite data when available, or reports that a Lite version is not available for that accession (requires toolkit 3.1.0 or later).
+</Note>
+
+## Progress and error reporting
+
+`prefetch` displays download progress as it runs. Since toolkit 3.2.0, error messages include a `phid` identifier that you can reference when contacting NCBI support to help diagnose network or resolver issues.
+
+## Verifying downloads
+
+After downloading, verify the integrity of the local file:
+
+```bash
+vdb-validate SRR000001
+```
+
+`vdb-validate` checks data and blob checksums. As of toolkit 3.1.0, it reports an error if checksums are missing.
+
+## Cache management
+
+<Note>
+`prefetch` stores runs in the local cache configured with `vdb-config`. The default location is `~/ncbi/public/`.
+</Note>
+
+To change the cache location, run:
+
+```bash
+vdb-config --interactive
+```
+
+Navigate to the cache settings and update the root directory. All subsequent `prefetch` calls write to the new location.
+
+When downloading accessions that contain aligned reads (cSRA format), `prefetch` also automatically downloads the external reference sequences required to reconstruct the alignment. You do not need to download references separately.
+
+<Tip>
+Always run `prefetch` before `fasterq-dump` for large accessions. If a conversion fails partway through, you can re-run `fasterq-dump` without re-downloading the accession from NCBI.
+</Tip>

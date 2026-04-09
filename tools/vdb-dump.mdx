@@ -1,0 +1,106 @@
+---
+title: "vdb-dump"
+description: "Inspect and export data from SRA VDB databases"
+---
+
+`vdb-dump` provides low-level access to VDB (Virtual DataBase) format SRA files. Use it to inspect column schemas, view accession metadata, and export raw data in various formats.
+
+## Synopsis
+
+```bash
+vdb-dump [options] <accession|path> [<accession2> ...]
+```
+
+## Basic usage
+
+```bash
+# Show accession metadata (size, type, schema)
+vdb-dump --info SRR000001
+
+# List all available columns
+vdb-dump --columns SRR000001
+
+# Dump specific columns
+vdb-dump -C READ,QUALITY SRR000001
+
+# Dump as FASTQ
+vdb-dump --format fastq SRR000001
+
+# Dump first 10 rows only
+vdb-dump -R 1-10 SRR000001
+
+# Show schema definition
+vdb-dump --schema SRR000001
+
+# JSON output
+vdb-dump --format json -C READ,QUALITY -R 1-5 SRR000001
+```
+
+## Options
+
+<ParamField path="--info" type="boolean">
+  Show accession metadata: path, size, type, and schema name.
+</ParamField>
+
+<ParamField path="-C / --columns" type="string">
+  Comma-separated list of columns to dump (e.g. `READ,QUALITY,SPOT_ID`).
+</ParamField>
+
+<ParamField path="--format" type="string">
+  Output format. Options: `default`, `csv`, `xml`, `json`, `piped`, `tab`, `fastq`, `fasta`.
+</ParamField>
+
+<ParamField path="-R / --rows" type="string">
+  Row range to dump (e.g. `1-100` or `5`).
+</ParamField>
+
+<ParamField path="--schema" type="boolean">
+  Display the schema definition for the accession.
+</ParamField>
+
+<ParamField path="-T / --table" type="string">
+  Specify a table within a multi-table database. Cannot be used simultaneously with `--view` (since 3.4.0).
+</ParamField>
+
+<ParamField path="--max-line-len" type="integer">
+  Maximum line length in output. Longer lines are truncated.
+</ParamField>
+
+## Checking accession size before conversion
+
+Before running `fasterq-dump` on a large accession, check its size:
+
+```bash
+vdb-dump --info SRR341578
+```
+
+Example output:
+
+```text
+acc    : SRR341578
+path   : /home/user/ncbi/public/sra/SRR341578.sra
+size   : 932,308,473
+type   : Table
+schema : NCBI:SRA:Illumina:tbl:q4:v2
+```
+
+The `size` field is in bytes. A 932 MB accession will expand to approximately 4× its compressed size in FASTQ, and fasterq-dump needs an additional scratch space of the same amount — plan for roughly 8–10× total.
+
+## Inspecting columns
+
+```bash
+# List all columns in an accession
+vdb-dump --columns SRR000001
+
+# Dump READ and QUALITY columns for the first 5 rows
+vdb-dump -C READ,QUALITY -R 1-5 SRR000001
+
+# Dump in CSV format
+vdb-dump --format csv -C READ,QUALITY -R 1-5 SRR000001
+```
+
+## What's new
+
+| Version | Change |
+|---|---|
+| 3.4.0 | Deny simultaneous use of `--table` and `--view`; fixed segfault with platform column having no value |

@@ -1,0 +1,238 @@
+---
+title: "vdb-config"
+description: "Configure the SRA Toolkit settings interactively or via command line"
+---
+
+`vdb-config` manages the SRA Toolkit's configuration: local cache location, remote access settings, cloud provider credentials, proxy settings, and dbGaP project workspaces. Run it once after installation to set up your environment before using other toolkit tools.
+
+## Synopsis
+
+```bash
+vdb-config [options]
+vdb-config --interactive
+vdb-config --set KEY=VALUE
+vdb-config --get KEY
+```
+
+## Modes of operation
+
+`vdb-config` operates in three modes depending on the flags you provide.
+
+### Print current configuration
+
+Called with no arguments, `vdb-config` prints the current configuration in XML format. No changes are made.
+
+```bash
+vdb-config
+```
+
+### Interactive TUI mode
+
+```bash
+vdb-config --interactive
+# or
+vdb-config -i
+```
+
+Opens a full-screen, color configuration dialog. Navigate with Tab and the arrow keys. The item with the focused indicator is active. Press Space or Enter to toggle a checkbox or activate a button. Press `q` or `6` to exit without saving, or navigate to **Save and exit** and press Space or Enter to write changes.
+
+<Note>
+  Interactive mode requires a terminal that supports cursor control. If the TUI does not display correctly (e.g., in some SSH sessions or terminal emulators), use textual mode instead.
+</Note>
+
+### Textual (non-TUI) interactive mode
+
+```bash
+vdb-config --interactive --interactive-mode textual
+```
+
+A sequential text-based dialog. Use this when the graphical TUI mode does not render correctly in your environment.
+
+### Command-line mode
+
+Set or query configuration values directly without opening any dialog:
+
+```bash
+# Set the local cache directory
+vdb-config --set /repository/user/main/public/root=$HOME/sra-cache
+
+# Read a configuration value
+vdb-config --get /repository/user/main/public/root
+
+# Restore factory defaults
+vdb-config --restore-defaults
+```
+
+## Options
+
+<ParamField path="--interactive / -i" type="flag">
+  Open the interactive configuration dialog (TUI by default).
+</ParamField>
+
+<ParamField path="--interactive-mode" type="string">
+  Set the interactive mode. Accepted values: `graphical` (default) or `textual`.
+</ParamField>
+
+<ParamField path="--restore-defaults" type="flag">
+  Reset all configuration to factory defaults, including populating the remote NCBI SRA repository entry. Since 3.3.0, this also populates the remote repository configuration.
+</ParamField>
+
+<ParamField path="--set / -s" type="string">
+  Set a configuration key to a value. Format: `KEY=VALUE`. Example: `--set /repository/user/main/public/root=/data/sra`.
+</ParamField>
+
+<ParamField path="--get" type="string">
+  Print the current value of a configuration key.
+</ParamField>
+
+<ParamField path="--cfg / -p" type="flag">
+  Print the current configuration.
+</ParamField>
+
+<ParamField path="--all / -a" type="flag">
+  Print all configuration information (default behavior).
+</ParamField>
+
+<ParamField path="--output / -o" type="string">
+  Output format for configuration display. Accepted values: `x` (XML, default) or `n` (native).
+</ParamField>
+
+<ParamField path="--files / -f" type="flag">
+  Print the list of configuration files that were loaded.
+</ParamField>
+
+<ParamField path="--env / -e" type="flag">
+  Print shell environment variables relevant to toolkit configuration.
+</ParamField>
+
+<ParamField path="--load-path / -d" type="flag">
+  Print the load path used to locate configuration and schema files.
+</ParamField>
+
+<ParamField path="--modules / -m" type="flag">
+  Print the list of external VDB schema modules found.
+</ParamField>
+
+<ParamField path="--cloud-info / -C" type="flag">
+  Display cloud-related information (AWS region, GCP project, etc.).
+</ParamField>
+
+<ParamField path="--report-cloud-identity" type="flag">
+  Give permission for the toolkit to report the cloud instance identity to NCBI. Required when running on AWS or GCP and accessing cloud-hosted SRA data to avoid unnecessary egress charges.
+</ParamField>
+
+<ParamField path="--accept-aws-charges" type="flag">
+  Agree to accept charges for AWS data access.
+</ParamField>
+
+<ParamField path="--set-aws-credentials" type="string">
+  Path to a file containing AWS credentials.
+</ParamField>
+
+<ParamField path="--set-aws-profile" type="string">
+  AWS profile name to use for credentials.
+</ParamField>
+
+<ParamField path="--accept-gcp-charges" type="flag">
+  Agree to accept charges for GCP data access.
+</ParamField>
+
+<ParamField path="--set-gcp-credentials" type="string">
+  Path to a file containing GCP credentials.
+</ParamField>
+
+<ParamField path="--proxy" type="string">
+  Set the HTTP proxy server configuration.
+</ParamField>
+
+<ParamField path="--proxy-disable" type="flag">
+  Enable or disable use of an HTTP proxy.
+</ParamField>
+
+<ParamField path="--prefetch-to-cwd" type="flag">
+  Configure `prefetch` to download files to the current working directory instead of the global cache.
+</ParamField>
+
+<ParamField path="--prefetch-to-user-repo" type="flag">
+  Configure `prefetch` to download files to the user repository (global cache). This is the default behavior. Use this flag to reset back to the default if `--prefetch-to-cwd` was previously set.
+</ParamField>
+
+<ParamField path="--import" type="string">
+  Path to an NGC file. Imports a dbGaP project workspace into the toolkit configuration.
+</ParamField>
+
+<ParamField path="--simplified-quality-scores / -Q" type="string">
+  Control preference for SRA Lite vs. SRA Normalized Format files. `yes` prefers Lite (simplified quality scores); `no` (default) prefers Normalized Format (full quality scores).
+</ParamField>
+
+<ParamField path="--ignore-protected-repositories" type="flag">
+  Suppress warning messages when a protected repository is found during configuration.
+</ParamField>
+
+<ParamField path="--root" type="flag">
+  Allow configuration updates when running as a superuser (root).
+</ParamField>
+
+## Key configuration paths
+
+Configuration keys follow a hierarchical path structure. The most commonly used paths are:
+
+| Key | Description |
+|---|---|
+| `/repository/user/main/public/root` | Local cache directory where accessions are downloaded |
+| `/repository/remote/main/CGI/resolver-cgi` | URL for the NCBI name resolver |
+| `/repository/user/protected/<project>/root` | Root path for a dbGaP protected project workspace |
+
+### Setting the cache directory
+
+```bash
+vdb-config --set /repository/user/main/public/root=/data/sra-cache
+```
+
+### Checking the current cache directory
+
+```bash
+vdb-config --get /repository/user/main/public/root
+```
+
+## Configuration file location
+
+Changes made by `vdb-config` are written to the user settings file:
+
+| Platform | Path |
+|---|---|
+| Linux / macOS | `~/.ncbi/user-settings.mkfg` |
+| Windows | `%APPDATA%\NCBI\user-settings.mkfg` |
+
+## Interactive mode: data source section
+
+The **data source** section of the interactive dialog controls remote access:
+
+- **NCBI SRA** checkbox — when enabled, tools can stream or resolve accessions directly from NCBI without a prior `prefetch`. Disable this to force local-only access.
+- **site** checkbox — visible only if a site-wide SRA installation is present on your system. Uncheck it to bypass the site cache.
+
+## Interactive mode: local workspaces section
+
+The **local workspaces** section manages local repositories:
+
+- **Import dbGaP-project** — opens a file browser to select an NGC file and register a protected project workspace.
+- **Set default import path** — choose a non-default base directory for new dbGaP project imports (useful when the home directory lacks sufficient space).
+- Repository list — the **Open Access Data** entry shows where public accessions are cached. Use the **Change** button to relocate it.
+
+<Note>
+  Changes made in interactive mode are only persisted when you exit via **Save and exit**. Pressing `q` or navigating to the exit button without saving discards all changes.
+</Note>
+
+## Importing a dbGaP project
+
+To access controlled-access data from dbGaP, import your NGC key file:
+
+```bash
+vdb-config --import /path/to/prj_phs000000_00.ngc
+```
+
+Or use the interactive mode: open `vdb-config -i`, navigate to **import dbGaP-project**, and select the NGC file in the directory browser.
+
+<Note>
+  The AWS credential interface was updated in 3.0.7. If you set AWS credentials with an older version of the toolkit, re-run `vdb-config` to re-enter them. The `--restore-defaults` flag populates the remote repository configuration starting from 3.3.0.
+</Note>

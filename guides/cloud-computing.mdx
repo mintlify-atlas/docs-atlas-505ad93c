@@ -1,0 +1,125 @@
+---
+title: "Cloud Computing"
+description: "Use the SRA Toolkit on AWS and GCP for large-scale analyses"
+---
+
+SRA data is mirrored in AWS S3 and Google Cloud Storage. Running analyses on cloud infrastructure co-located with SRA data eliminates large downloads from NCBI FTP, reduces latency, and makes it practical to scale to thousands of accessions using cloud batch services.
+
+<Note>
+Cloud-native access requires SRA Toolkit 2.10.0 or later. Access to both public SRA and controlled-access dbGaP data is supported from AWS and GCP environments.
+</Note>
+
+## Benefits of cloud access
+
+- **No egress from NCBI**: reads data directly from S3 or GCS buckets maintained by NCBI
+- **Lower latency**: compute instances and data are in the same region
+- **Scalable**: combine with AWS Batch, GCP Life Sciences, or workflow managers like Nextflow and Snakemake
+- **Original submission files**: `prefetch` retrieves both ETL and original submission formats for public and dbGaP-controlled data
+
+## Running on AWS
+
+<Steps>
+  <Step title="Launch an EC2 instance">
+    Any instance type works, but for large-scale conversions prefer instances with fast local NVMe storage (e.g., `i3`, `i4i`, or `m5d` families) so you have high-throughput scratch space for `fasterq-dump`.
+  </Step>
+  <Step title="Install the SRA Toolkit">
+    Install via conda (recommended for reproducibility) or download a pre-built binary:
+
+    ```bash
+    conda install -c bioconda sra-tools
+    ```
+  </Step>
+  <Step title="Configure AWS credentials">
+    Run the interactive configuration tool:
+
+    ```bash
+    vdb-config --interactive
+    ```
+
+    Enable AWS cloud access and, if needed, point the toolkit to your AWS credentials file. As of toolkit 3.0.7, the credential interface was updated to improve compatibility.
+  </Step>
+  <Step title="Download with prefetch">
+    Once configured, `prefetch` automatically pulls data from S3 instead of NCBI FTP:
+
+    ```bash
+    prefetch SRR000001
+    ```
+
+    No additional flags are needed — the toolkit detects the cloud environment and selects the nearest data source.
+  </Step>
+  <Step title="Convert to FASTQ">
+    ```bash
+    fasterq-dump SRR000001 -t /tmp
+    ```
+
+    Point `-t` at an instance store volume (e.g., `/tmp` on NVMe) for maximum scratch throughput.
+  </Step>
+</Steps>
+
+<Tip>
+When running on an EC2 instance with an IAM instance profile attached, the toolkit picks up credentials automatically. You do not need a credential file — just ensure the instance profile has S3 read access.
+</Tip>
+
+## Running on GCP
+
+<Steps>
+  <Step title="Launch a Compute Engine VM">
+    For scratch storage, use a VM with a local SSD attached and mount it before running conversions.
+  </Step>
+  <Step title="Install the SRA Toolkit">
+    ```bash
+    conda install -c bioconda sra-tools
+    ```
+  </Step>
+  <Step title="Configure GCP access">
+    ```bash
+    vdb-config --interactive
+    ```
+
+    Enable GCP cloud access in the configuration. The toolkit uses the GCS bucket maintained by NCBI for your region. GCP access tokens are supported as of toolkit 3.0.6.
+  </Step>
+  <Step title="Download and process">
+    `prefetch` uses GCS automatically once configured:
+
+    ```bash
+    prefetch SRR000001
+    fasterq-dump SRR000001 -t /tmp
+    ```
+  </Step>
+</Steps>
+
+## SharQ for cloud-native loading (advanced)
+
+SharQ is a tool for loading SRA data where both input and output reside in cloud storage buckets. Available since toolkit 3.4.0:
+
+```bash
+sharq --input s3://mybucket/input.bam --output s3://mybucket/output/
+```
+
+Key features:
+
+- Reads input directly from AWS S3 or GCP GCS buckets
+- Stores an MD5 checksum of the input file in the output metadata
+- Supports the `--max-reads-allowed` option to cap the number of reads processed
+- Supports the ElementBio sequencing platform
+
+## Large-scale batch processing
+
+For processing many accessions in parallel, combine `prefetch` and `fasterq-dump` with a job scheduler. A simple example using GNU Parallel:
+
+```bash
+cat accessions.txt | parallel -j 4 "prefetch {} && fasterq-dump {} -O /output/{} -t /tmp"
+```
+
+For production workflows, consider:
+
+- **AWS Batch**: submit one job per accession with an ECS container running the toolkit
+- **GCP Life Sciences** or **Batch**: similar containerized job submission
+- **Nextflow / Snakemake**: define rules that invoke `prefetch` and `fasterq-dump` with per-accession parallelism
+
+## Tips for cloud efficiency
+
+- Use instance types with local NVMe drives and mount them as the temp directory for `fasterq-dump`. This avoids saturating network-attached storage with scratch I/O.
+- For very large accessions, increase the thread count: `fasterq-dump SRR000001 -e 16`
+- Request SRA Lite format to reduce transfer volume: `prefetch --eliminate-quals SRR000001`
+- Global timeout frequency for cloud users was reduced in toolkit 3.1.0 — keep your toolkit up to date to avoid unnecessary retries.

@@ -1,0 +1,196 @@
+---
+title: "Converting to FASTQ"
+description: "Extract reads in FASTQ format using fasterq-dump"
+---
+
+`fasterq-dump` is the current recommended tool for converting SRA accessions to FASTQ format. It uses temporary files and multi-threading to perform bulk joins, making it significantly faster than the older `fastq-dump` for most accessions.
+
+<Note>
+Reads longer than 65,535 bases are supported as of toolkit 3.3.0.
+</Note>
+
+## Basic conversion
+
+```bash
+fasterq-dump SRR000001
+```
+
+For a paired-end accession, this produces two files in the current directory:
+
+- `SRR000001_1.fastq` — first reads of each spot
+- `SRR000001_2.fastq` — second reads of each spot
+
+For a single-end accession, it produces `SRR000001.fastq`.
+
+## Specifying output location
+
+```bash
+fasterq-dump SRR000001 -O /mnt/big_hdd
+```
+
+If parts of the output path do not exist, `fasterq-dump` creates them. If the output file already exists, the tool exits with an error rather than overwriting. To force overwrite:
+
+```bash
+fasterq-dump -f SRR000001
+```
+
+## Temporary directory (scratch space)
+
+`fasterq-dump` writes intermediate files to a temporary directory during conversion. By default, this directory (`fast.tmp`) is created in the current working directory and deleted when the conversion finishes. You can redirect it:
+
+```bash
+fasterq-dump SRR000001 -O /mnt/big_hdd -t /tmp/scratch
+```
+
+The scratch directory is not deleted after the run, but its contents are. For best performance, place the temp directory on a different filesystem from the output directory.
+
+<Tip>
+If you have sufficient RAM, use `/dev/shm` as the temp directory. This places intermediate files in memory and avoids disk I/O during the most intensive part of conversion:
+
+```bash
+fasterq-dump SRR341578 -t /dev/shm
+```
+
+Check available space first with `df -h /dev/shm`.
+</Tip>
+
+## Threading
+
+By default, `fasterq-dump` uses 6 threads. You can increase this to match your available CPU cores:
+
+```bash
+fasterq-dump SRR000001 -e 8
+```
+
+High thread counts can hit I/O bandwidth limits before CPU limits. Benchmark with a small accession to find the optimal value for your system:
+
+```bash
+time fasterq-dump SRR000001 -t /dev/shm
+time fasterq-dump SRR000001 -t /dev/shm -e 8
+time fasterq-dump SRR000001 -t /dev/shm -e 10
+```
+
+Repeat each benchmark at least twice to account for caching effects.
+
+To check available CPU cores:
+
+```bash
+# Linux
+nproc --all
+
+# macOS
+/usr/sbin/sysctl -n hw.ncpu
+```
+
+## Output formats
+
+<Tabs>
+  <Tab title="Split-3 (default)">
+    Spots are split into reads. Paired reads are written to `_1.fastq` and `_2.fastq`. Spots with only one read are written to the unpaired `.fastq` file.
+
+    ```bash
+    fasterq-dump SRR000001
+    ```
+
+    This is the most common format for paired-end Illumina data. No flag required.
+  </Tab>
+  <Tab title="Split-spot (-s)">
+    Spots are split into reads, but all reads are written to a single output file.
+
+    ```bash
+    fasterq-dump SRR000001 --split-spot
+    ```
+  </Tab>
+  <Tab title="Split-file (-S)">
+    Spots are split into reads. Each nth read goes to a separate file: all first reads to `_1.fastq`, all second reads to `_2.fastq`, and so on.
+
+    ```bash
+    fasterq-dump SRR000001 --split-files
+    ```
+  </Tab>
+  <Tab title="Concatenated">
+    Spots are not split. Each spot is written as a single 4-line FASTQ record.
+
+    ```bash
+    fasterq-dump SRR000001 --concatenate-reads
+    ```
+  </Tab>
+</Tabs>
+
+## Equivalent fastq-dump commands
+
+`fasterq-dump` uses different defaults from `fastq-dump`. The following pairs produce equivalent output, with `fasterq-dump` being faster:
+
+```bash
+# Default split-3 behavior
+fastq-dump SRRXXXXXX --split-3 --skip-technical
+fasterq-dump SRRXXXXXX
+
+# Split-spot behavior
+fastq-dump SRRXXXXXX --split-spot --skip-technical
+fasterq-dump SRRXXXXXX --split-spot
+
+# Split-files behavior
+fastq-dump SRRXXXXXX --split-files --skip-technical
+fasterq-dump SRRXXXXXX --split-files
+
+# Unsplit (concatenated) behavior, including technical reads
+fastq-dump SRRXXXXXX
+fasterq-dump SRRXXXXXX --concatenate-reads --include-technical
+```
+
+## Progress bar
+
+Enable the progress bar with `-p` to monitor long conversions:
+
+```bash
+fasterq-dump SRR341578 -t /dev/shm -p
+```
+
+For a cSRA (aligned) accession, the output looks like this:
+
+```text
+lookup :|-------------------------------------------------- 100.00%
+merge  : 13255208
+join   :|-------------------------------------------------- 100.00%
+concat :|-------------------------------------------------- 100.00%
+spots read      : 7,549,706
+reads read      : 15,099,412
+reads written   : 15,099,412
+```
+
+For a flat (unaligned) accession:
+
+```text
+join   :|-------------------------------------------------- 100.00%
+concat :|-------------------------------------------------- 100.00%
+spots read      : 470,985
+reads read      : 470,985
+reads written   : 470,985
+```
+
+## Disk space planning
+
+`fasterq-dump` needs scratch space roughly equal to the final output size, in addition to the output itself. As a rule of thumb, have **8–10x the accession size** available before starting a conversion.
+
+Check the accession size:
+
+```bash
+vdb-dump --info SRR341578
+```
+
+Look at the `size` field in the output. Then verify available disk space:
+
+```bash
+df -h .
+```
+
+The `Avail` column shows how much space is free on the current filesystem.
+
+## Key differences from fastq-dump
+
+- No `--gzip` / `--bzip2` option. Compress output explicitly after conversion using `gzip` or `bgzip`.
+- No `-A` flag for the accession — specify the accession directly as a positional argument.
+- No `--minSpotId` / `--maxSpotId` — `fasterq-dump` always processes the whole accession.
+- `--stdout` (`-Z`) does not work for split-3 and split-files modes. The tool falls back to writing files in those cases.
+- Processes one accession at a time. For batch processing, loop over accessions in your shell or use a workflow tool.

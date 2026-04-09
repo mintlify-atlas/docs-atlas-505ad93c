@@ -1,0 +1,273 @@
+---
+title: "Common Errors"
+description: "Diagnose and fix common SRA Toolkit errors"
+---
+
+<Warning>
+  **Versions 2.9.6 and older cannot connect to NCBI.** As of August 2022, NCBI updated its security infrastructure, and all toolkit versions 2.9.6 and earlier are permanently blocked from the data location service. If you see any connection refused or service unavailable error and are running an older version, upgrading is the only fix.
+
+  ```bash
+  # Check your version
+  fastq-dump --version
+
+  # Upgrade via conda
+  conda update sra-tools
+  ```
+
+  Or download the latest binary from [GitHub releases](https://github.com/ncbi/sra-tools/wiki/01.-Downloading-SRA-Toolkit).
+</Warning>
+
+<AccordionGroup>
+
+  <Accordion title="Connection and network errors">
+
+    **Cannot connect to NCBI data location service**
+
+    Versions 2.9.6 and older are permanently blocked. This is the most common cause of connection errors.
+
+    ```bash
+    # Upgrade via conda
+    conda update sra-tools
+
+    # Or download the latest binary
+    # https://github.com/ncbi/sra-tools/wiki/01.-Downloading-SRA-Toolkit
+    ```
+
+    ---
+
+    **"reference not found"**
+
+    Reference sequences are not available locally and were not stored inside the run. This typically happens when you run `fasterq-dump` directly on an aligned accession without first downloading it.
+
+    ```bash
+    # Prefetch the run and its dependencies first
+    prefetch SRR_ACCESSION
+
+    # Then convert
+    fasterq-dump SRR_ACCESSION
+
+    # If unsure where the run resolves, inspect it
+    srapath SRR_ACCESSION
+    ```
+
+    <Note>
+      This error was also triggered by a bug affecting reference sequences stored *inside* the run itself. That bug was fixed in 3.0.7. Upgrade to 3.0.7 or later if you continue to see this error after prefetching.
+    </Note>
+
+    ---
+
+    **HTTP access failures with fasterq-dump**
+
+    If you see failures when accessing runs via HTTP (not FTP or cloud), this was a known bug fixed in 3.2.1.
+
+    ```bash
+    conda update sra-tools
+    # or download 3.2.1+ from GitHub releases
+    ```
+
+    ---
+
+    **JWT or cloud authentication errors**
+
+    Some cloud storage providers use JWT tokens for authentication. A bug causing failures with JWT in certain cloud environments was fixed in 3.0.10.
+
+    ```bash
+    # Upgrade to 3.0.10 or later
+    conda update sra-tools
+
+    # Check your cloud identity configuration
+    vdb-config --report-cloud-identity
+    ```
+
+    ---
+
+    **GCP access token errors**
+
+    If prefetch fails with GCP-related access token errors, this was fixed in 3.0.6. Upgrade to 3.0.6 or later.
+
+    ```bash
+    conda update sra-tools
+    ```
+
+    AWS credential handling was also improved in 3.0.7. If you see AWS credential failures specifically with prefetch, upgrade to 3.0.7+.
+
+  </Accordion>
+
+  <Accordion title="Data and file errors">
+
+    **"buffer insufficient while converting string within text module" (macOS)**
+
+    This error appears during `prefetch` on macOS. It was a platform-specific bug fixed in 3.0.2.
+
+    ```bash
+    # Upgrade to 3.0.2 or later
+    conda update sra-tools
+    ```
+
+    ---
+
+    **fasterq-dump crash with WGS references**
+
+    A race condition caused fasterq-dump to crash when processing accessions that use WGS (Whole Genome Shotgun) references. Fixed in 3.2.1.
+
+    ```bash
+    conda update sra-tools
+    ```
+
+    ---
+
+    **fasterq-dump fails when output path contains '.'**
+
+    A dot (`.`) anywhere in the output path caused failures. Fixed in 3.2.1. Upgrade or use a path without dots as a temporary workaround.
+
+    ```bash
+    # Workaround: use an output path without dots
+    fasterq-dump SRR000001 -O /output/run_data
+
+    # Or upgrade to 3.2.1+
+    conda update sra-tools
+    ```
+
+    ---
+
+    **--fasta and --fasta-unsorted parameters not working**
+
+    These output format flags were broken and produced no output or incorrect output. Fixed in 2.11.3. Upgrade to 2.11.3 or later.
+
+    ---
+
+    **fasterq-dump segfault when platform column has no value**
+
+    Certain accessions with a missing platform column caused a segmentation fault. Fixed in 3.3.0.
+
+    ```bash
+    conda update sra-tools
+    ```
+
+    ---
+
+    **Disk space errors**
+
+    fasterq-dump requires roughly 8–10x the size of the accession on disk — the final output files expand the compressed SRA data, and the tool needs roughly the same amount again as scratch space for temporary files.
+
+    ```bash
+    # Check how much space you have in the current directory
+    df -h .
+
+    # Check accession size before starting
+    vdb-dump --info SRR341578
+    # Look for the "size" line in the output
+
+    # Redirect temp files to a filesystem with more space
+    fasterq-dump SRR000001 -t /tmp
+
+    # Or redirect both output and temp to different locations
+    fasterq-dump SRR000001 -O /mnt/big_disk/output -t /mnt/big_disk/tmp
+    ```
+
+    <Note>
+      If you run out of space mid-conversion, the tool will exit with an error and leave partial temporary files behind. Clean these up manually before retrying — they are stored in a directory named `fast.tmp` in the output location by default.
+    </Note>
+
+  </Accordion>
+
+  <Accordion title="Configuration errors">
+
+    **"Configuration not found"**
+
+    The toolkit has not been initialized and has no configuration file. Run the configuration restore command to set defaults.
+
+    ```bash
+    vdb-config --restore-defaults
+    ```
+
+    This creates a default configuration and populates the remote repository settings. You can then open the interactive configuration UI with `vdb-config -i` to review or change settings.
+
+    ---
+
+    **Toolkit hangs on macOS or BSD**
+
+    A bug caused the toolkit to hang indefinitely when data access was unreliable on macOS and BSD systems. Fixed in 3.1.0.
+
+    ```bash
+    conda update sra-tools
+    ```
+
+    Upgrade to 3.1.0 or later. If you cannot upgrade immediately, ensure your network connection is stable and retry with a timeout.
+
+    ---
+
+    **dbGaP access failures with NGC files**
+
+    If you are accessing controlled-access dbGaP data using an `.ngc` repository key file and prefetch fails to authenticate, this bug was fixed in 3.0.5.
+
+    ```bash
+    conda update sra-tools
+    ```
+
+    Verify the NGC file path is correct and that your dbGaP account has access to the requested accession.
+
+  </Accordion>
+
+  <Accordion title="Build errors">
+
+    **Build fails on machines without a static C++ library**
+
+    On systems where only shared (dynamic) C++ libraries are available, earlier versions failed to compile. Fixed in 3.2.0.
+
+    ```bash
+    # Clone and build with CMake (3.0.0+)
+    git clone https://github.com/ncbi/sra-tools
+    cd sra-tools
+    mkdir build && cd build
+    cmake ..
+    make
+    ```
+
+    ---
+
+    **Old Makefiles no longer work (3.0.0+)**
+
+    Since the 3.0.0 release, the SRA Toolkit build system was migrated to CMake. The old `configure`/`make` Makefiles are no longer supported and will not build correctly.
+
+    ```bash
+    # Correct: use CMake
+    mkdir build && cd build
+    cmake ..
+    make
+
+    # Incorrect: old approach no longer works
+    # ./configure && make
+    ```
+
+    If you are using an automated build script that references the old Makefiles, update it to use CMake.
+
+  </Accordion>
+
+</AccordionGroup>
+
+## Getting help
+
+Check your current version before filing a report — many issues are already fixed in recent releases.
+
+```bash
+# Check installed version
+fastq-dump --version
+
+# Upgrade via conda
+conda update sra-tools
+```
+
+Download the latest release binary from the [SRA Toolkit download page](https://github.com/ncbi/sra-tools/wiki/01.-Downloading-SRA-Toolkit).
+
+**When filing a bug report, include:**
+
+- The full command you ran
+- The complete error message, including any `phid` value printed by prefetch (since 3.2.0, prefetch prints a `phid` identifier in error messages — this helps NCBI trace the specific request on their end)
+- Your toolkit version (`fastq-dump --version`)
+- Your operating system and version
+
+**Report issues and contact:**
+
+- GitHub issues: [https://github.com/ncbi/sra-tools/issues](https://github.com/ncbi/sra-tools/issues)
+- Email: sra@ncbi.nlm.nih.gov

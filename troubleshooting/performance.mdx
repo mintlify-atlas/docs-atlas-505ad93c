@@ -1,0 +1,167 @@
+---
+title: "Performance Tuning"
+description: "Optimize fasterq-dump, prefetch, and other tools for faster data processing"
+---
+
+The primary bottlenecks when using the SRA Toolkit are I/O throughput and disk space. This page covers the most effective tuning options for `fasterq-dump`, `prefetch`, and cloud workflows.
+
+## fasterq-dump
+
+### Thread count
+
+fasterq-dump defaults to 6 threads. On machines with more cores, increasing the thread count can improve throughput — up to a point. Beyond the I/O bandwidth of your storage subsystem, adding threads produces diminishing returns.
+
+```bash
+# Default: 6 threads
+fasterq-dump SRR341578
+
+# Increase for machines with more cores
+fasterq-dump SRR341578 -e 8
+fasterq-dump SRR341578 -e 16
+```
+
+To find how many cores your machine has:
+
+```bash
+# Linux
+nproc --all
+
+# macOS
+/usr/sbin/sysctl -n hw.ncpu
+```
+
+Benchmark to find the thread count that works best for your storage:
+
+```bash
+time fasterq-dump SRR000001 -t /dev/shm
+time fasterq-dump SRR000001 -t /dev/shm -e 8
+time fasterq-dump SRR000001 -t /dev/shm -e 10
+```
+
+<Tip>
+  Repeat each benchmark at least twice. The first run may be slower due to network or filesystem caching effects — the second run gives a more stable measurement.
+</Tip>
+
+<Note>
+  Even with many CPU cores, I/O bandwidth is usually the bottleneck. Increasing threads beyond 8–10 rarely helps and can make things slower by creating contention on disk.
+</Note>
+
+### Temp file location
+
+This is the single most impactful optimization. fasterq-dump creates large temporary files during conversion. By default, these land in the same directory as your output. Placing them on a separate, faster filesystem cuts total conversion time significantly.
+
+```bash
+# Use a RAM disk as scratch space (fastest, if you have enough RAM)
+fasterq-dump SRR341578 -t /dev/shm
+
+# Use a separate SSD for temp while writing output to a spinning disk
+fasterq-dump SRR341578 -O /hdd/output -t /ssd/temp
+```
+
+The key principle: **put the output path and the temp path on different filesystems**. This avoids I/O contention between the write and merge phases.
+
+Check how much space is available on the RAM disk before using it:
+
+```bash
+df -h /dev/shm
+```
+
+## Disk space planning
+
+fasterq-dump inflates SRA-compressed data significantly. As a rule of thumb, have **8–10x the accession size** available before starting.
+
+```bash
+# Check accession size before starting
+vdb-dump --info SRR341578
+# Look for the "size" line in the output
+
+# Check available space in the current directory
+df -h .
+```
+
+For example, an accession reported as ~932 MB will produce FASTQ files totaling ~4.2 GB, plus roughly the same amount again in temporary scratch files — around 8 GB total.
+
+If you do not have enough space in the current directory, use `-O` to redirect output and `-t` to redirect temp files to a filesystem with more room:
+
+```bash
+fasterq-dump SRR341578 -O /mnt/large_volume/output -t /mnt/large_volume/tmp
+```
+
+## SRA Lite for reduced transfer times
+
+If your analysis does not require per-base quality scores, you can request SRA Lite files. These are smaller, transfer faster, and produce simplified quality scores (quality = 30 or 3 depending on the read filter flag).
+
+```bash
+# Download SRA Lite version (smaller, faster transfer)
+prefetch --eliminate-quals SRR000001
+```
+
+SRA Lite files use a `.sralite` extension. If a Lite version is not available for the requested accession, `prefetch` will report that and fall back accordingly.
+
+## Prefetch before fasterq-dump
+
+For large accessions, always run `prefetch` first, then convert with `fasterq-dump`. Prefetching downloads the full accession to a local cache in SRA format before conversion begins.
+
+```bash
+prefetch SRR341578
+fasterq-dump SRR341578 -O /output -t /tmp
+```
+
+Benefits:
+- If the conversion fails partway through, you do not need to re-download the data — retry `fasterq-dump` directly against the cached file
+- `prefetch` supports retry logic internally (via `PrfRetrier`), making it more robust over unreliable connections than streaming directly
+- Reference sequences and dependencies are resolved and downloaded together
+
+## Cloud performance
+
+If you are running on AWS or GCP, prefer cloud-native data access rather than downloading from NCBI FTP. The toolkit can access SRA data directly from cloud storage in the same region, which is much faster.
+
+Since 3.1.0, the toolkit also reduces the frequency of global timeouts for cloud users, making long-running jobs more reliable.
+
+Recommendations for cloud instances:
+
+- Point temp files to instance store NVMe for maximum I/O throughput:
+
+  ```bash
+  fasterq-dump SRR341578 -O /output -t /mnt/instance-store
+  ```
+
+- Set thread count to match your instance's vCPU count:
+
+  ```bash
+  fasterq-dump SRR341578 -e 16  # for a 16-vCPU instance
+  ```
+
+- Use `vdb-config --report-cloud-identity` to verify the toolkit detects your cloud environment and can access cloud storage directly.
+
+## Parallel processing of multiple accessions
+
+fasterq-dump processes one accession at a time. To process a list of accessions in parallel, use GNU parallel to run multiple jobs concurrently:
+
+```bash
+# Process 4 accessions at a time using GNU parallel
+cat accessions.txt | parallel -j 4 \
+  "prefetch {} && fasterq-dump {} -O /output -t /tmp/{}"
+```
+
+Adjust `-j 4` to match the number of parallel jobs your I/O subsystem can sustain without contention. On a fast NVMe array, you may run 8 or more; on a shared network filesystem, 2–4 is often the practical limit.
+
+## Monitoring progress
+
+Enable the progress bar to track conversion stages in real time:
+
+```bash
+fasterq-dump SRR341578 -p
+```
+
+The output shows progress for each conversion phase (lookup, merge, join, concat) and a summary of spots and reads written at the end:
+
+```text
+lookup :|-------------------------------------------------- 100.00%
+merge  : 13255208
+join   :|-------------------------------------------------- 100.00%
+concat :|-------------------------------------------------- 100.00%
+spots read      : 7,549,706
+reads read      : 15,099,412
+reads written   : 15,099,412
+```

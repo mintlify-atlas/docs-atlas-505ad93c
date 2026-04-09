@@ -1,0 +1,125 @@
+---
+title: "vdb-validate"
+description: "Validate the integrity of SRA VDB database files"
+---
+
+`vdb-validate` checks the structural and data integrity of SRA accessions stored in VDB format. Use it to confirm that a downloaded accession is complete and uncorrupted before running expensive downstream processing.
+
+## Synopsis
+
+```bash
+vdb-validate [options] <accession|path> [<accession2> ...]
+```
+
+## Basic examples
+
+```bash
+# Validate a downloaded accession
+vdb-validate SRR000001
+
+# Validate with verbose output
+vdb-validate -v SRR000001
+
+# Validate multiple accessions
+vdb-validate SRR000001 SRR000002 SRR000003
+
+# Validate a local path
+vdb-validate /data/sra-cache/SRR000001
+```
+
+## What vdb-validate checks
+
+`vdb-validate` performs several layers of integrity verification:
+
+- **File structure and schema** — confirms the VDB object conforms to its declared schema
+- **MD5 checksums** — verifies MD5 sums for column files when present
+- **Blob (data) checksums** — validates CRC checksums for every data blob in the accession
+- **Index integrity** — checks B-tree index files for corruption
+- **Row count consistency** — compares row counts across related tables
+  - **Alignment ranges** — checks that alignment positions fall within the declared reference length (added in 3.4.0)
+- **Redaction correctness** — optional check (`--check-redact`) for proper masking of filtered reads
+
+<Warning>
+  Do not use data from an accession that fails `vdb-validate` in downstream analyses. The file may be corrupted or incompletely downloaded.
+</Warning>
+
+## Options
+
+<ParamField path="-v / --verbose" type="flag">
+  Verbose output. Reports each column checked along with its result. Repeat for additional verbosity.
+</ParamField>
+
+<ParamField path="--exhaustive" type="flag">
+  Continue checking after the first error rather than stopping immediately. Useful for a full damage assessment.
+</ParamField>
+
+<ParamField path="--md5" type="flag">
+  Explicitly require and verify MD5 checksums. Since 3.1.0, `vdb-validate` reports a warning (not an error) when blob checksums are missing; use this flag to treat missing checksums as errors.
+</ParamField>
+
+<ParamField path="--blob-crc" type="flag">
+  Verify CRC checksums for every data blob. Enabled by default.
+</ParamField>
+
+<ParamField path="--index-only" type="flag">
+  Check index integrity only, skipping column data.
+</ParamField>
+
+<ParamField path="--consist-check" type="flag">
+  Perform consistency checks across tables (e.g., row count agreement between SEQUENCE and PRIMARY_ALIGNMENT tables).
+</ParamField>
+
+<ParamField path="--check-redact" type="flag">
+  Check that filtered reads have been correctly redacted (masked). Added in 3.0.10.
+</ParamField>
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Validation passed — the accession is structurally sound |
+| Non-zero | Validation failed — see stderr output for the specific error |
+
+## Workflow integration
+
+A common pattern is to validate immediately after `prefetch` before any downstream tool is invoked:
+
+<Steps>
+  <Step title="Download the accession">
+    ```bash
+    prefetch SRR000001
+    ```
+  </Step>
+  <Step title="Validate the downloaded data">
+    ```bash
+    vdb-validate SRR000001
+    ```
+    If this exits with a non-zero code, re-run `prefetch` or investigate the error message before proceeding.
+  </Step>
+  <Step title="Process the validated accession">
+    ```bash
+    fasterq-dump SRR000001 -O /output
+    ```
+  </Step>
+</Steps>
+
+As a one-liner with short-circuit evaluation:
+
+```bash
+prefetch SRR000001 && vdb-validate SRR000001 && fasterq-dump SRR000001 -O /output
+```
+
+## Validation parameters for data integrity checks
+
+`vdb-validate` exposes parameters to tune the secondary alignment and sequence data consistency checks (`sdc`). These are controlled via the `vdb_validate_params` struct internally:
+
+| Parameter | Description |
+|---|---|
+| `sdc_enabled` | Enable data integrity checks between SEQUENCE and PRIMARY_ALIGNMENT tables |
+| `sdc_sec_rows` | Number or percentage of secondary alignment rows to check |
+| `sdc_seq_rows` | Number or percentage of sequence rows to check |
+| `sdc_pa_len_thold` | Threshold for pairwise alignment length comparison |
+
+<Note>
+  Since 3.1.0, `vdb-validate` reports an error if data (blob) checksums are missing from an accession. Since 3.4.0, alignment ranges are also checked against reference length.
+</Note>

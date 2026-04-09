@@ -1,0 +1,111 @@
+---
+title: "sra-pileup"
+description: "Generate pileup statistics and SAM output from aligned SRA data"
+---
+
+`sra-pileup` processes aligned (cSRA) sequencing data to generate pileup statistics or SAM-format output. The toolkit also includes `sam-dump` as part of the sra-pileup package for SAM output.
+
+<Info>
+  `sra-pileup` and `sam-dump` only work with aligned (cSRA) accessions. For non-aligned data, use `fasterq-dump`.
+</Info>
+
+## Synopsis
+
+```bash
+sra-pileup [options] <accession> [<accession2> ...]
+sam-dump   [options] <accession> [<accession2> ...]
+```
+
+## Basic usage
+
+```bash
+# Generate pileup output
+sra-pileup SRR341578
+
+# SAM output (pipe to samtools)
+sra-pileup --function sam SRR341578 | samtools sort -o output.bam -
+
+# Limit to a genomic region
+sra-pileup SRR341578 -r chr1:1000000-2000000
+
+# Output to a file
+sra-pileup SRR341578 -o pileup.txt
+
+# Stream remote accession (no prefetch required)
+sra-pileup SRR341578
+```
+
+## Options
+
+<ParamField path="-r / --aligned-region" type="string">
+  Restrict output to a specific genomic region. Format: `chr:start-end` (e.g. `chr1:1000000-2000000`).
+</ParamField>
+
+<ParamField path="--function" type="string">
+  Output function to use. Options: `pileup` (default), `sam`, `ref`, `ref-ex`, `count`, `stat`, `varcount`.
+</ParamField>
+
+<ParamField path="-o / --outfile" type="string">
+  Write output to a file. Default: stdout.
+</ParamField>
+
+<ParamField path="--minmapq" type="integer">
+  Minimum mapping quality threshold. Reads with a MAPQ below this value are excluded from pileup output. Short alias: `-q`.
+</ParamField>
+
+<ParamField path="--ngc" type="string">
+  Path to a dbGaP NGC file for controlled-access data.
+</ParamField>
+
+## SAM output and samtools integration
+
+`sra-pileup --function sam` outputs standard SAM format, which can be piped directly to samtools:
+
+```bash
+# Convert to sorted, indexed BAM
+sra-pileup --function sam SRR341578 \
+  | samtools sort -o aligned.bam -
+samtools index aligned.bam
+
+# View a specific region from the BAM
+samtools view aligned.bam chr1:1000000-2000000
+
+# Get alignment statistics
+samtools flagstat aligned.bam
+```
+
+## Reference sequences
+
+Aligned accessions require reference sequences. `prefetch` downloads them automatically:
+
+```bash
+prefetch SRR341578
+sra-pileup SRR341578
+```
+
+<Note>
+  A "reference not found" error usually means the references were not downloaded. Run `prefetch SRR341578` first. This was also fixed in 3.0.7 for references stored inside the run itself.
+</Note>
+
+Use `srapath` to see where the toolkit expects to find references:
+
+```bash
+srapath SRR341578
+```
+
+## align-info
+
+`align-info` displays alignment statistics for an accession without generating full output:
+
+```bash
+align-info SRR341578
+```
+
+This shows mapping rate, reference coverage, and read count — useful for a quick quality check before running a full pileup.
+
+## What's new
+
+| Version | Change |
+|---|---|
+| 3.4.0 | Fixed crash when alignment is invalid |
+| 3.0.7 | Fixed "reference not found" for references stored inside a run |

@@ -1,0 +1,126 @@
+---
+title: "Cloud Access"
+description: "Configure the SRA Toolkit to access data in AWS and GCP"
+---
+
+SRA data is mirrored in AWS S3 and Google Cloud Storage. When you run analyses inside AWS or GCP, accessing data from the same cloud provider's storage is significantly faster than downloading from NCBI FTP — and avoids consuming your local disk.
+
+Cloud-native access has been available since toolkit version 2.10.0 (initially Linux only; now broadly supported).
+
+## How cloud access works
+
+When cloud access is enabled, tools like `prefetch` and `fasterq-dump` resolve accessions to their cloud-resident copies first. Data moves within the same cloud network, which reduces latency, avoids egress charges from NCBI, and scales better for large cohort analyses.
+
+<Tip>
+Use AWS or GCP access when running large-scale analyses on cloud infrastructure. It reduces dependence on NCBI rate limits and significantly improves throughput.
+</Tip>
+
+## AWS configuration
+
+### Enable AWS access
+
+You can enable AWS access and point to your credentials file via the command line:
+
+```bash
+vdb-config --set-aws-credentials $HOME/.aws/credentials
+```
+
+Or use the interactive dialog (`vdb-config -i`) to navigate to the AWS section and configure credentials there. The AWS credential interface was updated in toolkit version 3.0.7.
+
+### Set an AWS profile
+
+If your `~/.aws/credentials` file contains multiple named profiles, specify which one to use:
+
+```bash
+vdb-config --set-aws-profile my-profile
+```
+
+### Accept AWS charges
+
+Accessing data in AWS S3 may incur charges depending on your account and the data's location. Acknowledge this before enabling:
+
+```bash
+vdb-config --accept-aws-charges yes
+```
+
+### EC2 instance profiles
+
+When running on an EC2 instance with an attached IAM role, the toolkit picks up instance profile credentials automatically. You do not need to configure a credentials file explicitly.
+
+### Example: fasterq-dump from EC2
+
+Running `fasterq-dump` on an EC2 instance will automatically hit the S3 copy of the data when cloud access is enabled:
+
+```bash
+fasterq-dump SRR000001
+```
+
+No additional flags are required — the toolkit resolves the nearest cloud copy transparently.
+
+## GCP configuration
+
+### Enable GCP access
+
+Point the toolkit to your GCP service account key file:
+
+```bash
+vdb-config --set-gcp-credentials /path/to/service-account-key.json
+```
+
+This can also be done in the interactive dialog (`vdb-config -i`) under the GCP section.
+
+### Accept GCP charges
+
+As with AWS, confirm acceptance of any GCP usage charges before enabling:
+
+```bash
+vdb-config --accept-gcp-charges yes
+```
+
+### GCP access tokens
+
+Since toolkit version 3.0.6, `prefetch` supports the latest GCP token format for authenticated access. Ensure your service account has the appropriate Cloud Storage read permissions.
+
+### Example: prefetch from a GCP VM
+
+When running on a Compute Engine VM with a configured service account, `prefetch` uses GCP Storage directly:
+
+```bash
+prefetch SRR000001
+```
+
+## Reporting cloud identity
+
+Some access scenarios require reporting your cloud instance identity to NCBI for telemetry and access control. Check or configure this setting with:
+
+```bash
+vdb-config --report-cloud-identity yes
+```
+
+To inspect the current cloud identity configuration:
+
+```bash
+vdb-config --cloud-info
+```
+
+## Accessing original submission files
+
+In addition to NCBI's ETL-processed data, `prefetch` can retrieve the original files submitted to SRA for both public and controlled-access dbGaP datasets stored in AWS or GCP:
+
+```bash
+prefetch --type orig SRR000001
+```
+
+This is useful when you need the raw submitted FASTQ, BAM, or other files rather than the SRA-normalized format.
+
+## Troubleshooting
+
+<Note>
+Cloud users experienced a reduced frequency of global timeout errors starting in toolkit version 3.1.0. If you see frequent timeout errors, ensure you are running a current version of the toolkit.
+</Note>
+
+If cloud access is configured but accessions still resolve to NCBI rather than cloud storage, verify that:
+
+1. The correct credentials file path is set and the file is readable.
+2. Your IAM role or service account has `s3:GetObject` (AWS) or `storage.objects.get` (GCP) permissions on the SRA bucket.
+3. `vdb-config --cloud-info` shows the expected cloud provider and identity.

@@ -1,0 +1,98 @@
+---
+title: "dbGaP Access"
+description: "Configure controlled-access dbGaP data with NGC files"
+---
+
+The [Database of Genotypes and Phenotypes (dbGaP)](https://www.ncbi.nlm.nih.gov/gap/) hosts controlled-access human genomic and phenotypic data. Downloading this data requires an approved access application and a project-specific `.ngc` credential file.
+
+<Warning>
+Keep your `.ngc` file secure. It contains credentials that grant access to controlled-access data for your approved project. Do not share it or check it into version control.
+</Warning>
+
+## Setup
+
+<Steps>
+
+<Step title="Apply for dbGaP project access">
+Submit a data access request through the [dbGaP portal](https://dbgap.ncbi.nlm.nih.gov/). Access is granted on a per-project basis and requires institutional approval. You will receive notification when access is approved.
+</Step>
+
+<Step title="Download your project's .ngc file">
+Once access is approved, log in to the dbGaP portal and download the `.ngc` file for your project. This file encodes your project credentials and is tied to your approved access.
+</Step>
+
+<Step title="Import the .ngc file with vdb-config">
+Register the `.ngc` file with the toolkit so it can authenticate downloads:
+
+```bash
+vdb-config --import /path/to/project.ngc
+```
+
+Alternatively, use the interactive dialog:
+
+```bash
+vdb-config -i
+```
+
+Navigate to the "local workspaces" section and select the **"import dbGaP-project"** button. A file browser dialog will open:
+
+- The cursor starts in the files list (it may be empty initially).
+- Press the **up** cursor key to move focus to the directories list.
+- Press **Enter** on a directory name to navigate into it; select `[ .. ]` to go up to the parent.
+- Press **Tab** to switch back to the files list once you have located the `.ngc` file.
+- Press **Enter** on the `.ngc` file to import it. A success message confirms the import.
+
+<Note>
+On Windows, you cannot switch between drive letters in the file select dialog. Ensure your `.ngc` file is on the same drive as your working directory before opening the browser.
+</Note>
+</Step>
+
+<Step title="Set the default import path (if needed)">
+By default, dbGaP project workspaces are created under your home directory. If your home directory does not have enough space, set a different default location before or after importing:
+
+```bash
+vdb-config -i
+```
+
+Navigate to **"set default import path"** in the "local workspaces" section and specify a directory on a larger volume. You can also change the location for an individual project after it has been imported.
+</Step>
+
+<Step title="Download controlled-access data with prefetch">
+Use `prefetch` with the `--ngc` flag to authenticate and download controlled-access accessions:
+
+```bash
+prefetch --ngc /path/to/project.ngc SRR000001
+```
+
+The toolkit verifies your credentials against the accession's project and downloads to your configured cache location.
+</Step>
+
+<Step title="Convert to FASTQ with fasterq-dump">
+Pass the same `.ngc` file when converting controlled-access SRA files:
+
+```bash
+fasterq-dump --ngc /path/to/project.ngc SRR000001
+```
+
+Both `prefetch` and `fasterq-dump` require the `--ngc` flag whenever operating on controlled-access data.
+</Step>
+
+</Steps>
+
+## Local workspaces
+
+After importing one or more dbGaP projects, the "local workspaces" section in `vdb-config -i` lists all registered repositories:
+
+- **Open Access Data** — always present; this is where public accessions are cached.
+- **dbGaP project entries** — one entry per imported `.ngc` file, listed below the open access entry.
+
+You can change the storage path for any repository by selecting it and pressing the "Change" button.
+
+## Notes
+
+- A bug affecting dbGaP data access with `.ngc` files was fixed in toolkit version 3.0.5. If you experience authentication failures, ensure you are running at least version 3.0.5.
+- If you need to access original submission files (not just SRA-normalized data) for your dbGaP project via cloud storage, combine the `--ngc` flag with `--type orig`:
+
+  ```bash
+  prefetch --ngc /path/to/project.ngc --type orig SRR000001
+  ```

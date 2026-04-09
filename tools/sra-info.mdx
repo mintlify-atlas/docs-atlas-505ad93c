@@ -1,0 +1,147 @@
+---
+title: "sra-info"
+description: "Display platform and metadata information about SRA accessions"
+---
+
+`sra-info` reports sequencing platform, spot layout, schema, and fingerprint information about SRA accessions. Use it to quickly identify what kind of data an accession contains before choosing a downstream processing strategy.
+
+## Synopsis
+
+```bash
+sra-info [options] <accession> [<accession2> ...]
+```
+
+## Basic examples
+
+```bash
+# Show platform and layout info
+sra-info SRR000001
+
+# Increase detail level
+sra-info --detail 2 SRR000001
+
+# Show fingerprint information
+sra-info --fingerprint SRR000001
+
+# JSON output
+sra-info --json SRR000001
+
+# Show spot layout for the first 1000 rows only
+sra-info --spot-layout --rows 1000 SRR000001
+
+# Show schema information
+sra-info --schema SRR000001
+```
+
+## Options
+
+<ParamField path="--detail / -d" type="integer">
+  Detail level for spot layout output. Accepted values:
+
+  - `1` (Short) — read count per spot only
+  - `2` (Abbreviated) — read types (B = biological, T = technical) without lengths
+  - `3` (Full) — read types with lengths
+  - `4` (Verbose) — full type names (`BIOLOGICAL|FORWARD`, `TECHNICAL|REVERSE`, etc.) with lengths
+
+  Default is `1`.
+</ParamField>
+
+<ParamField path="--fingerprint / -F" type="flag">
+  Show fingerprint information for the accession. Includes cryptographic hash data for verifying accession content integrity. Added in 3.3.0.
+</ParamField>
+
+<ParamField path="--json" type="flag">
+  Output in JSON format.
+</ParamField>
+
+<ParamField path="--platform" type="flag">
+  Report the sequencing platform only.
+</ParamField>
+
+<ParamField path="--spot-layout" type="flag">
+  Report the read layout within each spot (read count, types, and lengths depending on `--detail` level). Added in 3.0.6.
+</ParamField>
+
+<ParamField path="--rows" type="integer">
+  Limit the spot layout query to the first N rows. Useful for quick checks on large accessions. Added in 3.0.7.
+</ParamField>
+
+<ParamField path="--schema" type="flag">
+  Report the VDB schema information for the accession. Added in 3.0.7.
+</ParamField>
+
+## Supported platforms
+
+`sra-info` recognizes the following sequencing platforms:
+
+| Platform | Notes |
+|---|---|
+| Illumina | Various instruments (HiSeq, NovaSeq, etc.) |
+| PacBio SMRT | Long-read circular consensus sequencing |
+| Oxford Nanopore | Long-read nanopore sequencing |
+| BGI/MGI | DNBSEQ instruments |
+| Ion Torrent | Semiconductor sequencing |
+| 454 Life Sciences | Pyrosequencing (legacy) |
+| Complete Genomics | Legacy short-read platform |
+| Singular Genomics | Added in 3.2.0 |
+| Geneus | Added in 3.3.0 |
+| Salus | Added in 3.3.0 |
+| ElementBio | Supported by SharQ in 3.4.0 |
+
+When the `PLATFORM` column is absent from the accession, `sra-info` reports `SRA_PLATFORM_UNDEFINED`.
+
+## Spot layout detail levels
+
+The `--spot-layout` query reads `READ_TYPE` and `READ_LEN` columns for every spot and groups identical layouts by frequency. The `--detail` flag controls how much type information is shown:
+
+```bash
+# Abbreviated: B/T labels only, no lengths
+sra-info --spot-layout --detail 2 SRR000001
+
+# Full: type labels with per-read lengths
+sra-info --spot-layout --detail 3 SRR000001
+
+# Verbose: full type names with lengths
+sra-info --spot-layout --detail 4 SRR000001
+```
+
+Read type abbreviations used at detail levels 2 and 3:
+
+| Code | Meaning |
+|---|---|
+| `B` | Biological |
+| `T` | Technical |
+| `BF` | Biological, Forward |
+| `BR` | Biological, Reverse |
+| `TF` | Technical, Forward |
+| `TR` | Technical, Reverse |
+
+## Fingerprinting
+
+Since 3.3.0, `sra-info` can display fingerprint data for an accession. Fingerprints provide cryptographic verification of data content and are useful for integrity checking after transfer or archival.
+
+```bash
+sra-info --fingerprint SRR000001
+```
+
+Use `--json` together with `--fingerprint` to capture the output programmatically:
+
+```bash
+sra-info --fingerprint --json SRR000001
+```
+
+<Note>
+  Prior to 3.3.0, using `--detail` with a level greater than 1 alongside `--fingerprint` caused an error. This was fixed in 3.3.0. Also note that `sra-info` was introduced in 3.0.5 as a new tool.
+</Note>
+
+## Output formats
+
+`sra-info` supports the following output formats via the `Formatter` class:
+
+| Format | Flag |
+|---|---|
+| Default (human-readable) | _(no flag)_ |
+| CSV | `--csv` |
+| XML | `--xml` |
+| JSON | `--json` |
+| Tab-separated | `--tab` |

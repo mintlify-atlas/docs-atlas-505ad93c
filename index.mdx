@@ -1,97 +1,81 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "SRA Toolkit"
+description: "Download, convert, and analyze sequencing data from the NCBI Sequence Read Archive"
 ---
 
-## Setting up
+The SRA Toolkit is a collection of command-line tools from NCBI for working with data in the INSDC Sequence Read Archive (SRA). Use it to download SRA accessions, convert them to FASTQ or SAM/BAM formats, and inspect read data — on local machines or in the cloud.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install the SRA Toolkit on Linux, macOS, or Windows using pre-built binaries or build from source
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Download your first SRA accession and convert it to FASTQ in under five minutes
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Configuration" icon="gear" href="/configuration/overview">
+    Configure toolkit settings, cache location, remote access, and cloud credentials
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Tool Reference" icon="terminal" href="/tools/fasterq-dump">
+    Full reference for every tool — fasterq-dump, prefetch, sra-pileup, vdb-dump, and more
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Get started quickly
 
-Everything you need to create world-class documentation.
+<Steps>
+  <Step title="Download and install">
+    Get the latest pre-built binaries for your platform from the [download page](https://github.com/ncbi/sra-tools/wiki/01.-Downloading-SRA-Toolkit) or install via Conda.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+    ```bash
+    conda install -c bioconda sra-tools
+    ```
+  </Step>
+  <Step title="Configure the toolkit">
+    Run `vdb-config` to set your cache directory and enable remote access to NCBI data.
 
-## Need inspiration?
+    ```bash
+    vdb-config --interactive
+    ```
+  </Step>
+  <Step title="Prefetch an accession">
+    Download an SRA accession to your local cache with `prefetch`.
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+    ```bash
+    prefetch SRR000001
+    ```
+  </Step>
+  <Step title="Convert to FASTQ">
+    Extract reads in FASTQ format using `fasterq-dump`.
+
+    ```bash
+    fasterq-dump SRR000001
+    ```
+  </Step>
+</Steps>
+
+## Key tools
+
+<CardGroup cols={3}>
+  <Card title="fasterq-dump" icon="bolt" href="/tools/fasterq-dump">
+    Multi-threaded FASTQ extraction from SRA accessions
+  </Card>
+  <Card title="prefetch" icon="cloud-arrow-down" href="/tools/prefetch">
+    Download SRA data and dependencies to a local cache
+  </Card>
+  <Card title="sra-pileup" icon="dna" href="/tools/sra-pileup">
+    Pileup and SAM/BAM output for aligned sequencing data
+  </Card>
+  <Card title="vdb-dump" icon="database" href="/tools/vdb-dump">
+    Inspect and export data from SRA-format VDB databases
+  </Card>
+  <Card title="vdb-config" icon="sliders" href="/tools/vdb-config">
+    Interactive configuration tool for the SRA Toolkit
+  </Card>
+  <Card title="sra-stat" icon="chart-bar" href="/tools/sra-stat">
+    Statistics and metadata about SRA accessions
+  </Card>
+</CardGroup>
+
+<Note>
+  The SRA Toolkit is a United States Government work produced by the National Center for Biotechnology Information (NCBI). It is freely available to the public for use. Contact the team at sra@ncbi.nlm.nih.gov.
+</Note>

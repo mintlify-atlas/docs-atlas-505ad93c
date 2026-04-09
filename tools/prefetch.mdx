@@ -1,0 +1,254 @@
+---
+title: "prefetch"
+description: "Download SRA accessions and their dependencies to a local cache"
+---
+
+`prefetch` downloads SRA accessions, their reference sequence dependencies, and original submission files from NCBI, AWS, or GCP to your local file cache. For aligned data, it automatically resolves and downloads any external reference sequences the run depends on. Downloads can be sourced over HTTPS or via Aspera (fasp) for faster transfers.
+
+## Synopsis
+
+```bash
+prefetch [options] <accession> [<accession2> ...]
+prefetch [options] --option-file <file>
+```
+
+## Examples
+
+```bash
+# Download a single accession
+prefetch SRR000001
+
+# Download multiple accessions in one command
+prefetch SRR000001 SRR000002 SRR000003
+
+# Read accession IDs from a file (one per line)
+prefetch --option-file accessions.txt
+
+# Download to a specific output directory
+prefetch --output-directory ~/sra-data SRR000001
+
+# Download SRA Lite files (simplified quality scores, smaller size)
+prefetch --eliminate-quals SRR000001
+
+# Download controlled-access dbGaP data using an NGC key file
+prefetch --ngc /path/to/project.ngc SRR000001
+
+# Download original submission files instead of the SRA-normalized copy
+prefetch --type orig SRR000001
+```
+
+## Options
+
+<ParamField path="--output-directory" type="string">
+  Write downloaded files to this directory. Defaults to the local cache
+  directory configured by `vdb-config`. Use this to redirect downloads to a
+  custom location rather than the global cache.
+</ParamField>
+
+<ParamField path="--eliminate-quals" type="boolean">
+  Download SRA Lite files, which store simplified (binned) quality scores.
+  SRA Lite files are smaller and faster to transfer. Using this flag enforces
+  the SRA Lite format even when full-quality data is available. Introduced in
+  3.1.0.
+</ParamField>
+
+<ParamField path="--type" type="string">
+  Type of data to download. Accepted values:
+
+  - `sra` (default) — download the SRA-normalized run file
+  - `orig` — download the original submission files as deposited by the submitter
+</ParamField>
+
+<ParamField path="--option-file" type="string">
+  Path to a plain-text file containing one accession per line. Use this when
+  you have a large list of accessions to download in batch.
+</ParamField>
+
+<ParamField path="--ngc" type="string">
+  Path to an NGC key file for decrypting controlled-access dbGaP data. Required
+  when downloading protected datasets. Obtain the NGC file from the dbGaP
+  Authorized Access portal.
+</ParamField>
+
+<ParamField path="--cart" type="string">
+  Path to a JWT cart file. Used for downloading data referenced by an NCBI
+  cart object.
+</ParamField>
+
+<ParamField path="--location" type="string">
+  Preferred data source location. Accepted values: `AWS`, `GCP`, or `NCBI`.
+  When set, `prefetch` attempts to resolve data from the specified cloud
+  provider before falling back to NCBI.
+</ParamField>
+
+<ParamField path="--transport" type="string">
+  Network transport to use. Accepted values: `ascp` (Aspera), `http`, or
+  `fasp,http` (try Aspera first, fall back to HTTP). Defaults to HTTPS when
+  Aspera is not installed.
+</ParamField>
+
+<ParamField path="--max-size" type="string">
+  Skip files larger than this size. Accepts suffixes `k`, `m`, `g` (e.g.,
+  `5g` for 5 GB). Useful for filtering out unexpectedly large accessions in a
+  batch run.
+</ParamField>
+
+<ParamField path="--min-size" type="string">
+  Skip files smaller than this size. Accepts the same suffixes as `--max-size`.
+</ParamField>
+
+<ParamField path="--force" type="string">
+  Control how already-downloaded files are handled:
+
+  - `no` (default) — skip complete, already-cached files
+  - `yes` — re-download and overwrite complete files
+  - `all` — re-download; ignore lock files but keep any existing transaction file
+  - `ALL` — re-download; ignore both lock files and transaction files
+</ParamField>
+
+<ParamField path="--progress" type="boolean">
+  Show a real-time download progress bar. Useful when downloading large runs
+  interactively.
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean">
+  Resolve accessions and check availability without actually downloading any
+  data. Use this to verify that names resolution succeeds before committing to
+  a long batch job.
+</ParamField>
+
+<ParamField path="--verbose" type="boolean">
+  Increase output verbosity. Pass multiple times (`-vv`, `-vvv`) for
+  progressively more detail, including HTTP retry events and cache resolution
+  steps.
+</ParamField>
+
+## How prefetch stores files
+
+`prefetch` writes data to the local cache managed by `vdb-config`. You can
+inspect or change the cache path with `vdb-config -i` (interactive mode) or
+by editing `~/.ncbi/user-settings.mkfg`.
+
+When `--output-directory` is provided, downloaded files are placed there
+instead of the global cache, and the directory layout mirrors the cache
+structure: each accession gets its own subdirectory (e.g.,
+`~/sra-data/SRR000001/SRR000001.sra`).
+
+## Downloading dependencies for aligned runs
+
+Aligned SRA runs reference external sequences (e.g., a human genome assembly)
+that are stored separately from the run itself. `prefetch` detects these
+dependencies automatically via `VDBDependencies` and downloads any missing
+reference sequences before the main run file. This means you can use
+`fasterq-dump` or `sam-dump` on the cached accession without a network
+connection.
+
+<Tip>
+  If you see "reference not found" errors when converting an aligned run, run
+  `prefetch` again on the same accession. It will download any dependencies
+  that were missed on the first pass.
+</Tip>
+
+## Controlled-access dbGaP data
+
+To download protected datasets from dbGaP:
+
+<Steps>
+  <Step title="Obtain your NGC key file">
+    Log in to the [dbGaP Authorized Access portal](https://dbgap.ncbi.nlm.nih.gov/aa/wga.cgi?page=login)
+    and download the NGC key file for your approved project.
+  </Step>
+  <Step title="Run prefetch with the --ngc flag">
+    ```bash
+    prefetch --ngc /path/to/prj_phs000001.ngc SRR000001
+    ```
+  </Step>
+  <Step title="Validate the download">
+    ```bash
+    vdb-validate SRR000001
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  The NGC file is tied to your dbGaP project approval. Do not share it or
+  commit it to version control.
+</Warning>
+
+## Batch downloads
+
+### From a file list
+
+```bash
+prefetch --option-file accessions.txt
+```
+
+The file should contain one accession per line, with no extra whitespace or
+headers:
+
+```text
+SRR000001
+SRR000002
+SRR000003
+```
+
+### Combining with srapath to pre-check availability
+
+```bash
+#!/bin/bash
+for acc in SRR000001 SRR000002 SRR000003; do
+  if srapath "$acc" &>/dev/null; then
+    prefetch "$acc"
+  else
+    echo "Skipping $acc: not resolved"
+  fi
+done
+```
+
+## Validating downloaded files
+
+After downloading, verify file integrity with `vdb-validate`:
+
+```bash
+vdb-validate SRR000001
+```
+
+`vdb-validate` checks MD5 checksums and structural consistency. If validation
+fails, re-run `prefetch --force yes SRR000001` to replace the corrupted file.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Error includes a phid value">
+    Since 3.2.0, `prefetch` prints a `phid` (phone-home ID) in error messages.
+    Include this value when opening a support ticket — it lets NCBI staff
+    correlate your request with server-side logs.
+  </Accordion>
+  <Accordion title="Download stalls or times out">
+    If HTTPS downloads are unreliable on your network, install
+    [Aspera Connect](https://www.ibm.com/aspera/connect/) and re-run
+    `prefetch`. It will detect the Aspera client automatically and use the fasp
+    protocol. Aspera support was fixed in 3.3.0.
+  </Accordion>
+  <Accordion title="--output-file is not recognized">
+    `--output-file` was deprecated in 3.3.0. Use `--output-directory` instead.
+    When only one accession is being downloaded, the file name is derived
+    automatically from the accession ID.
+  </Accordion>
+  <Accordion title="prefetch fails when downloading multiple runs">
+    A failure when prefetching multiple runs in a single invocation was fixed in
+    3.3.0. If you are on an older version, download runs one at a time or
+    upgrade the toolkit.
+  </Accordion>
+</AccordionGroup>
+
+## Release notes
+
+| Version | Change |
+|---------|--------|
+| 3.3.0 | Fixed memory leak; fixed Aspera transfers; deprecated `--output-file`; improved directory path handling; fixed failure when prefetching multiple runs |
+| 3.2.1 | Improved error reporting when a file or dependency download fails |
+| 3.2.0 | Prints a `phid` in error messages; restored listing of cart file contents; improved error messages when unable to resolve an external reference |
+| 3.1.1 | Improved reaction to problems with data; better information messages; reduced output with `--quiet`; improved tracking of corrupt downloads |
+| 3.1.0 | `--eliminate-quals` now enforces SRA Lite download format |
+| 3.0.10 | Prints NCBI_PHID after names-resolver errors to simplify troubleshooting |

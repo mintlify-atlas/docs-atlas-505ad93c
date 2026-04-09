@@ -1,0 +1,248 @@
+---
+title: "srapath"
+description: "Resolve the path or URL for an SRA accession"
+---
+
+`srapath` resolves SRA accession identifiers to file paths or URLs, showing
+where the data is located — in your local cache, on NCBI servers, or in cloud
+storage. It queries the same name-resolution infrastructure that `prefetch`
+and `fasterq-dump` use internally, making it a useful diagnostic and
+scripting tool.
+
+## Synopsis
+
+```bash
+srapath [options] <accession> [<accession2> ...]
+```
+
+## Examples
+
+```bash
+# Resolve the local cache path for a downloaded accession
+srapath SRR000001
+
+# Resolve a remote HTTPS URL
+srapath --function names --protocol https SRR000001
+
+# Resolve from a specific cloud location
+srapath --location AWS SRR000001
+
+# Resolve and include cache path alongside the remote URL
+srapath --function names --cache SRR000001
+
+# Output raw resolver reply without parsing
+srapath --raw SRR000001
+
+# Output resolver reply formatted as JSON
+srapath --json SRR000001
+
+# Resolve a protected dbGaP accession
+srapath --ngc /path/to/project.ngc SRR000001
+
+# Resolve multiple accessions at once
+srapath SRR000001 SRR000002 SRR000003
+```
+
+## Options
+
+<ParamField path="--function" type="string">
+  Function to perform. Accepted values:
+
+  - `resolve` (default) — resolve a local file path from the configured
+    repositories and cache
+  - `names` — call the NCBI names CGI to obtain a remote URL; use this when
+    you need an HTTPS or fasp URL rather than a local path
+  - `search` — search all configured locations for the accession
+</ParamField>
+
+<ParamField path="--location" type="string">
+  Preferred data source for the names lookup. Accepted values: `AWS`, `GCP`,
+  or `NCBI`. When set, the resolver biases results toward the specified cloud
+  provider.
+</ParamField>
+
+<ParamField path="--protocol" type="string">
+  Network protocol to request in the names response. Accepted values: `https`
+  (default), `http`, `fasp`, or comma-separated combinations such as
+  `fasp,https`. Only meaningful when `--function names` is also specified.
+  Short alias: `-a`.
+</ParamField>
+
+<ParamField path="--cache" type="boolean">
+  When performing a names lookup, also resolve and print the local cache path
+  alongside the remote URL. Short alias: `-c`.
+</ParamField>
+
+<ParamField path="--ngc" type="string">
+  Path to an NGC key file for resolving controlled-access dbGaP accessions.
+  Obtain the NGC file from the dbGaP Authorized Access portal.
+</ParamField>
+
+<ParamField path="--perm" type="string">
+  Path to a JWT cart file. Use when resolving accessions referenced by an
+  NCBI cart object.
+</ParamField>
+
+<ParamField path="--project" type="number">
+  Numeric dbGaP project ID to include in the names CGI call. Short alias:
+  `-d`.
+</ParamField>
+
+<ParamField path="--raw" type="boolean">
+  Print the raw resolver reply without parsing or formatting it. Useful for
+  debugging the resolver response or for scripting with tools like `jq`.
+  Short alias: `-r`.
+</ParamField>
+
+<ParamField path="--json" type="boolean">
+  Print the resolver reply formatted as JSON. Short alias: `-j`.
+</ParamField>
+
+<ParamField path="--path" type="boolean">
+  Print only the file path portion of the names response, suppressing other
+  fields. Only applies when `--function names` is used. Short alias: `-P`.
+</ParamField>
+
+<ParamField path="--timeout" type="number">
+  Timeout in seconds for the names CGI request. Short alias: `-t`.
+</ParamField>
+
+<ParamField path="--url" type="string">
+  Override the base URL used for CGI calls. Useful for testing against a
+  staging resolver endpoint. Short alias: `-u`.
+</ParamField>
+
+<ParamField path="--vers" type="string">
+  Version string to include in CGI calls. Short alias: `-e`.
+</ParamField>
+
+<ParamField path="--verbose" type="boolean">
+  Increase output verbosity. Pass multiple times for progressively more detail.
+</ParamField>
+
+## Use cases
+
+### Check whether an accession is cached locally
+
+The default `resolve` function checks local repositories and the configured
+cache. If the accession is present locally, `srapath` prints the absolute
+path. If it is not found, it exits with a non-zero status and no output.
+
+```bash
+srapath SRR000001
+# /home/user/ncbi/public/sra/SRR000001.sra  (if cached)
+```
+
+### Get a remote HTTPS URL for manual download
+
+```bash
+srapath --function names --protocol https SRR000001
+```
+
+This calls the NCBI names resolver and prints the HTTPS URL. You can pass
+the result to `curl` or `wget` for a manual download outside of the toolkit.
+
+### Resolve cloud-specific URLs
+
+```bash
+# Get an AWS S3 URL
+srapath --function names --location AWS SRR000001
+
+# Get a GCP Cloud Storage URL
+srapath --function names --location GCP SRR000001
+```
+
+### Troubleshoot "reference not found" errors
+
+When `fasterq-dump` or `sam-dump` report that a reference sequence cannot
+be found, use `srapath` to inspect what the resolver returns for that
+reference accession:
+
+```bash
+srapath NC_000001.11
+```
+
+A missing or wrong path here means `prefetch` has not downloaded the
+reference yet, or the cache path is misconfigured. Run `prefetch` on the
+parent run accession to download the missing reference.
+
+### Pre-check availability in a shell script before bulk download
+
+```bash
+#!/bin/bash
+accessions=(SRR000001 SRR000002 SRR000003)
+
+for acc in "${accessions[@]}"; do
+  path=$(srapath "$acc" 2>/dev/null)
+  if [ -n "$path" ]; then
+    echo "$acc: available at $path"
+  else
+    echo "$acc: not found locally — queuing for download"
+    prefetch "$acc"
+  fi
+done
+```
+
+<Tip>
+  Redirect stderr to `/dev/null` (`2>/dev/null`) when using `srapath` in
+  scripts. The tool writes resolver diagnostics to stderr, which would
+  otherwise pollute captured output.
+</Tip>
+
+## Resolver functions in detail
+
+`srapath` supports three distinct resolution strategies, selected with
+`--function`:
+
+| Function  | What it does |
+|-----------|--------------|
+| `resolve` | Searches local repositories and the SRA cache. Fast; no network call. |
+| `names`   | Calls the NCBI SDL (SDL names service) to obtain a remote path or URL. Requires a network connection. |
+| `search`  | Queries all configured locations — local, remote NCBI, and cloud — and reports every match. |
+
+<Note>
+  The default function is `resolve` unless `--protocol` is specified, in which
+  case `srapath` automatically switches to `names` to perform the remote
+  lookup.
+</Note>
+
+## Controlled-access dbGaP data
+
+To resolve a protected dbGaP accession, provide the NGC key file:
+
+```bash
+srapath --ngc /path/to/prj_phs000001.ngc SRR000001
+```
+
+<Warning>
+  The NGC file encodes your dbGaP project credentials. Do not share it or
+  commit it to version control.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="srapath prints nothing and exits non-zero">
+    The accession is not present in any configured local repository or cache.
+    Run `prefetch <accession>` to download it, then re-run `srapath` to confirm
+    the path.
+  </Accordion>
+  <Accordion title="Remote URL resolution fails or times out">
+    Use `--timeout` to increase the request timeout, or check your network
+    proxy settings. You can also use `--raw` to see the raw resolver response
+    and identify the failure point.
+  </Accordion>
+  <Accordion title="Wrong path returned for directory-format accessions">
+    Directory path handling for accession-as-directory (AD) format was improved
+    in 3.3.0. Upgrade the toolkit if you see incorrect paths for runs stored in
+    directory format.
+  </Accordion>
+</AccordionGroup>
+
+## Release notes
+
+| Version | Change |
+|---------|--------|
+| 3.3.0 | Improved directory path handling for accession-as-directory format |
+| 3.2.0 | Simplified name resolving; fixed resolving of WGS references in AD format |
+| 3.0.10 | Prints NCBI_PHID after names-resolver errors to simplify troubleshooting |
